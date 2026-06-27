@@ -92,12 +92,24 @@ That is the entire server responsibility.
 
 Each user gets a persistent Linux container — their computer. Hearth provisions it with a sensible baseline:
 
-- `bash` + core GNU utilities
+- `bash` + core GNU utilities, `sudo`
 - `git`, `curl`, `wget`, `ssh`, `ca-certificates`
-- `python3` + `pip` + `venv`, `node` + `npm`, `build-essential`
+- `python3` + `pip` + `venv` + `pipx`, `node` + `npm`, `build-essential`
 - editors and inspectors: `vim`, `nano`, `less`, `htop`, `tree`, `jq`
 
-Everything else — any LLM CLI, any SDK, any language, any service — the user installs with the normal package managers. The home directory persists across sessions (volume in dev; network storage in production).
+Everything else — any LLM CLI, any SDK, any language, any service — the user installs with the normal package managers. They have **passwordless `sudo`** (it's their own isolated box), so `apt install` works just like a real machine.
+
+### 6.1 Installing tools, and what persists
+
+The product promise is that adding AI agents/CLIs "just works" and survives. The container is configured so user-level installs land in the **persistent home volume**:
+
+- `NPM_CONFIG_PREFIX=~/.npm-global` — `npm install -g` needs no sudo and persists.
+- `~/.local/bin` on `PATH` — `pip install --user` and `pipx` persist.
+- `~/.bashrc` (seeded on first run) is the place for API keys (`export …`), which persist across sessions.
+
+An entrypoint seeds dotfiles and these directories on first launch (the home volume starts empty and would otherwise shadow the image's `/etc/skel`).
+
+System-level `apt` installs work but are not yet persistent (the rootfs is rebuilt); **persistent system state is a Phase 2 item** (overlay / committable rootfs). Until then, tools installed via `pipx` / `npm -g` / `pip --user` persist. See `docs/installing-tools.md`.
 
 ---
 
@@ -126,7 +138,7 @@ A user can scale their machine up — more CPU/RAM, or a GPU — when they need 
 ## 8. Security Model
 
 - **Session isolation:** one Linux container per user (cgroups, namespaces); Phase 1 Docker with resource limits, Phase 2+ Firecracker/gVisor microVMs. No inter-container network.
-- **The container is the trust boundary.** Anything the user runs stays inside their own sandbox, with their own permissions.
+- **The container is the trust boundary.** The user has root (`sudo`) *inside* their own container by design — it's their machine. Isolation is enforced at the container boundary (cgroups/namespaces, microVM in Phase 2+), not by restricting what they can do within it. Resource caps and egress limits guard against abuse.
 - **Auth:** Phase 1 JWT passed on WS connect; Phase 2 passkeys / OAuth.
 - **Transport:** WSS everywhere. PTY traffic is relayed browser ⇄ container. Any keys a user stores live in *their* container, never in Hearth's control plane.
 
@@ -174,6 +186,7 @@ Users pay their *own* AI/API providers directly — that cost never touches Hear
 - [x] PWA client: full-screen xterm.js terminal
 - [x] Node terminal bridge: PTY ⇄ WebSocket, resize, reconnect grace
 - [x] Docker image: capable Linux workspace + bridge
+- [x] Install-friendly machine: `sudo`, persistent user-level install paths, seeded dotfiles, tool/key recipes
 - [ ] Session persistence and auth
 - [ ] Mobile key bar + paste/clipboard
 - [ ] Multiple tabs / concurrent sessions
@@ -182,7 +195,7 @@ Users pay their *own* AI/API providers directly — that cost never touches Hear
 
 ### Phase 2 — More machine on demand
 
-Scale CPU/RAM/GPU up and down from any device; metering/billing; Kubernetes-native scheduling; scale-to-zero.
+Scale CPU/RAM/GPU up and down from any device; metering/billing; Kubernetes-native scheduling; scale-to-zero. **Persistent system rootfs** (committable / overlay) so `apt`-installed software survives, not just the home directory.
 
 ### Phase 3 — Teams, workspaces, self-host
 

@@ -26,7 +26,7 @@ $ ollama run llama3             # run a model yourself
 $ git clone … && cargo build    # or just… do normal computer things
 ```
 
-Hearth gives you the computer and the terminal. What runs on it is entirely yours.
+Hearth gives you the computer and the terminal. What runs on it is entirely yours. You get `sudo`, the usual package managers, and a home directory that persists — so installing AI agents/CLIs (and their API keys) works just like on a real machine. See **[docs/installing-tools.md](docs/installing-tools.md)** for copy-paste recipes (aider, Claude Code, Gemini CLI, ollama, …).
 
 ## Principles
 
@@ -43,6 +43,7 @@ Hearth gives you the computer and the terminal. What runs on it is entirely your
 | `server/` | Node.js terminal bridge: WebSocket ⇄ PTY (`node-pty`) in the container. |
 | `docker/` | The container image (a capable Linux workspace) and Compose setup. |
 | `docs/hearth-spec.md` | Full technical spec. |
+| `docs/installing-tools.md` | How to install AI agents/CLIs and persist keys. |
 
 ## Run it
 
