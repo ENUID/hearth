@@ -35,7 +35,7 @@ export default function App() {
           {SESSION_ID}
         </span>
         <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 11 }}>
-          tip: run <code style={{ color: "var(--accent)" }}>hermes "…"</code> for the AI agent
+          your computer, in the browser
         </span>
       </div>
 

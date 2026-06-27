@@ -1,6 +1,6 @@
 # Hearth — Technical Specification
 
-> Version: 0.2 (Phase 1 draft) · ENUID Labs
+> Version: 0.3 (Phase 1 draft) · ENUID Labs
 
 ---
 
@@ -10,9 +10,11 @@ Remove the hardware requirement from computing. The computer lives in the cloud;
 
 ## 2. The shape of the product
 
-Hearth is **a cloud terminal**, not an AI chat app. The terminal is the entire interface. Because it's a real shell on a real Linux container, anything that exists on the command line today works — including AI.
+Hearth is **a web terminal** — and nothing more. The terminal is the entire interface and the entire product. Behind it is a real, persistent Linux container. Because it's a real shell on a real machine, anything you can do from a command line, you can do here.
 
-**Agents are CLI tools, not a built-in feature.** Hearth ships one agent (`hermes`) preinstalled so there's value on first launch, but it lives on `PATH` like any other command. Users can install other agents (`aider`, etc.) or models (`ollama`) and use them identically. This keeps the platform open and keeps the surface area small: Hearth maintains a terminal, not an opinion about which AI you use.
+**Hearth ships no AI, no agents, no bundled tools beyond a sensible baseline OS toolchain.** Whatever a user wants — an LLM CLI, an API client, a language runtime, a database — they install it and pay for it themselves, exactly as they would on any computer. This keeps the product radically focused: Hearth maintains a terminal and the machine behind it, and has no opinion about what runs on it.
+
+The design goal is **maximum terminal capability**: interactive TUIs (vim, htop), full color, job control, long-running processes, package installation, persistent state — everything a native terminal offers, faithfully, in the browser, on any device.
 
 ---
 
@@ -34,17 +36,13 @@ Hearth is **a cloud terminal**, not an AI chat app. The terminal is the entire i
                │ PTY
 ┌──────────────▼─────────────────────────────────┐
 │  Container (persistent Linux)                  │
-│   bash + toolchain (git, python, node, curl)   │
-│   ├── hermes        ← preinstalled CLI agent   │
-│   ├── aider / etc.  ← user-installed agents    │
-│   └── any CLI / model the user installs        │
-│                                                │
-│   hermes ──► OpenAI-compatible inference API   │
-│             (shared vLLM pool / stub / BYO)    │
+│   bash + baseline toolchain                     │
+│   (git, python, node, build tools, curl, vim…) │
+│   └── the user installs anything else they want │
 └────────────────────────────────────────────────┘
 ```
 
-The bridge is deliberately thin: it moves bytes between the browser and a PTY. It knows nothing about AI. The agent (`hermes`) runs *inside* the container as a subprocess of the user's shell, and it — not the server — talks to the inference endpoint.
+The bridge is deliberately thin: it moves bytes between the browser and a PTY and manages session lifecycle. It contains no application logic beyond that.
 
 ### 3.1 Component Responsibilities
 
@@ -53,20 +51,22 @@ The bridge is deliberately thin: it moves bytes between the browser and a PTY. I
 | PWA Client | React 19 + Vite + xterm.js | Full-screen browser terminal |
 | Terminal Bridge | Node.js + `node-pty` + `ws` | WebSocket ⇄ PTY; session lifecycle |
 | Container | Docker → Firecracker/gVisor | The actual Linux machine |
-| `hermes` CLI | Node.js + OpenAI-compat client | Shipped agent; runs in the terminal |
-| Inference Backend | vLLM (shared) / stub / BYO | Hosts the model `hermes` calls |
 | Persistence | Volume mount (dev) → EFS/S3 | Home directory across sessions |
 
 ---
 
 ## 4. Client (PWA)
 
-A single full-screen terminal. No chat pane, no editor chrome — the shell is the UI.
+A single full-screen terminal. No chat, no editor chrome — the shell is the UI.
 
-- **Terminal:** `@xterm/xterm` with `FitAddon` (resize to viewport) and `WebLinksAddon` (clickable URLs).
+- **Terminal:** `@xterm/xterm` with `FitAddon` (resize to viewport) and `WebLinksAddon` (clickable URLs). 256-color theme, generous scrollback.
 - **Transport:** binary WebSocket to `/pty`. Raw PTY bytes in both directions; resize sent as a JSON control frame `{"type":"resize","cols":N,"rows":N}` on the same socket.
 - **Reconnect:** auto-reconnect with backoff; the server keeps the PTY alive briefly so a dropped phone connection doesn't kill the session.
 - **PWA:** `manifest.json` (`display: standalone`), service worker for the app shell, installable to the home screen, mobile viewport with `viewport-fit=cover`.
+
+### 4.1 Mobile considerations (Phase 1+)
+
+Phones lack the keys a terminal needs. Planned: an accessory key bar (Esc, Tab, Ctrl, arrows, `|`, `/`, `~`), paste integration, and font-size controls — so the terminal is genuinely usable one-handed.
 
 ---
 
@@ -78,97 +78,73 @@ WS   /pty?sid=<id>    → attach a PTY
 ```
 
 On WS connect:
-1. Look up or create the session's PTY (`node-pty` spawning `$SHELL` / `/bin/bash`).
+1. Look up or create the session's PTY (`node-pty` spawning `$SHELL` / `/bin/bash`, `TERM=xterm-256color`).
 2. Pipe PTY output → WS as binary frames.
 3. Pipe WS binary frames → PTY stdin.
 4. Intercept `{"type":"resize",...}` JSON frames and resize the PTY.
 5. On WS close: keep the PTY alive for a grace window (reconnect), then reap.
 
-That's the entire server responsibility. No agent logic lives here.
+That is the entire server responsibility.
 
 ---
 
-## 6. Agents as CLI tools
+## 6. The Container (the machine)
 
-### 6.1 Model
+Each user gets a persistent Linux container — their computer. Hearth provisions it with a sensible baseline:
 
-An agent in Hearth is just a program on `PATH`. It reads a task, does work in the current directory (files, shell, git), and prints results. This is the normal CLI contract, so every existing terminal agent already fits.
+- `bash` + core GNU utilities
+- `git`, `curl`, `wget`, `ssh`, `ca-certificates`
+- `python3` + `pip` + `venv`, `node` + `npm`, `build-essential`
+- editors and inspectors: `vim`, `nano`, `less`, `htop`, `tree`, `jq`
 
-### 6.2 The shipped agent: `hermes`
-
-`hermes-cli` is built on [NousResearch Hermes](https://github.com/NousResearch/hermes-agent), a tool-calling fine-tune. It is `npm install -g`'d into the container image so `hermes` is available immediately.
-
-```bash
-hermes "write a fastapi hello-world and run it"   # one-shot
-hermes                                            # interactive session
-echo "summarize README.md" | hermes               # stdin
-```
-
-**Tools** (operate relative to the current working directory):
-
-| Tool | Description |
-|------|-------------|
-| `fs_read` / `fs_write` / `fs_list` | File operations |
-| `shell_run` | Execute a shell command (returns stdout+stderr) |
-| `git_status` / `git_diff` / `git_commit` | Git operations |
-
-**Loop:**
-
-```
-messages = [system] + history
-loop (max N):
-  stream completion (tools enabled) → print tokens to stdout
-  if finish_reason == "tool_calls":
-    for each call: run tool, print activity, append result
-    continue
-  else: append assistant message, return
-```
-
-**Inference client** speaks OpenAI Chat Completions (`POST /v1/chat/completions`). Configured by env (`INFERENCE_BASE_URL`, `INFERENCE_MODEL`, `INFERENCE_API_KEY`). `STUB_INFERENCE=true` gives a deterministic mock so the CLI is usable with no model running.
-
-### 6.3 Safety
-
-`shell_run` enforces a timeout and an output cap, and pattern-blocks obviously destructive system-level commands (e.g. `rm -rf /`, `mkfs`, fork bombs). The agent runs with the user's own permissions inside the user's own container — the real isolation boundary is the container itself (section 8), not the agent.
+Everything else — any LLM CLI, any SDK, any language, any service — the user installs with the normal package managers. The home directory persists across sessions (volume in dev; network storage in production).
 
 ---
 
-## 7. GPU / Inference Economics
+## 7. Compute Economics
 
-### 7.1 Shared pool (Phase 1)
+Hearth sells **the computer**, not what runs on it. Costs and pricing track compute, storage, and bandwidth — never third-party AI usage (users bring their own keys and pay their providers directly).
 
-A small cluster of shared vLLM instances hosts Hermes 8B. Free-tier users share capacity via vLLM request batching. Per-token cost at 8B scale is low and amortized across concurrent users; covered by baseline SaaS margin. `hermes` points here by default.
+### 7.1 Idle-to-zero containers
 
-### 7.2 Dedicated GPU pods (Phase 2)
+Free and low-tier containers sleep when idle and wake on connect. This keeps the marginal cost of an inactive user near zero, which is what makes a free tier sustainable.
 
-A user spins up a GPU pod (A10G/A100/H100) on demand in <90 s, leased per-minute, scale-to-zero after idle. Larger models (70B/405B) or the user's own weights run here. Revenue = pass-through GPU cost + margin; Hearth owns no GPUs.
+### 7.2 More machine on demand (Phase 2)
 
-### 7.3 Cost model (estimates)
+A user can scale their machine up — more CPU/RAM, or a GPU — when they need it, and back down (to zero) when they don't. GPU pods are leased per-minute from providers; Hearth passes the cost through with margin. This is about giving the *user's* terminal more horsepower (so they can run their own heavy workloads or models), not about Hearth providing inference.
 
-| Tier | Inference | Container | GPU |
-|------|-----------|-----------|-----|
-| Free | Shared 8B | Always-on 0.5 vCPU / 1 GB | None |
-| Pro $20/mo | Shared 8B, priority | 2 vCPU / 4 GB | 5 GPU-hrs/mo included |
-| GPU on-demand | — | — | ~$0.80–3.50/hr by GPU |
+### 7.3 Indicative pricing
+
+| Tier | Machine | Notes |
+|------|---------|-------|
+| Free | Small, idle-to-zero (e.g. 0.5 vCPU / 1 GB) | Sleeps when idle |
+| Pro | Always-on, larger (e.g. 2 vCPU / 4 GB) | Persistent, priority wake |
+| On-demand GPU | Add a GPU per-minute | Pass-through + margin (Phase 2) |
 
 ---
 
 ## 8. Security Model
 
 - **Session isolation:** one Linux container per user (cgroups, namespaces); Phase 1 Docker with resource limits, Phase 2+ Firecracker/gVisor microVMs. No inter-container network.
-- **The container is the trust boundary.** The agent and any user-installed CLI run inside it with the user's permissions; nothing they do escapes the sandbox.
+- **The container is the trust boundary.** Anything the user runs stays inside their own sandbox, with their own permissions.
 - **Auth:** Phase 1 JWT passed on WS connect; Phase 2 passkeys / OAuth.
-- **Transport:** WSS everywhere. PTY traffic is relayed browser ⇄ container. Inference API keys live in the container/server, never in the browser.
+- **Transport:** WSS everywhere. PTY traffic is relayed browser ⇄ container. Any keys a user stores live in *their* container, never in Hearth's control plane.
 
 ---
 
 ## 9. Business Model
 
+Hearth monetizes compute and hosting — the cloud computer itself:
+
 | Stream | Mechanism |
 |--------|-----------|
-| SaaS subscription | Free / Pro tiers |
-| GPU metering | Pass-through + margin on on-demand pods |
-| Enterprise / self-host | License + support for on-prem |
-| Fine-tuning jobs | Metered GPU time (Phase 3) |
+| Subscription | Free (idle-to-zero) / Pro (always-on, bigger machine) |
+| Compute metering | On-demand CPU/RAM/GPU scale-up, pass-through + margin |
+| Storage | Larger / faster persistent volumes |
+| Teams | Per-seat workspaces (Phase 3) |
+| Self-host / enterprise | License + support for on-prem (Phase 3) |
+
+Users pay their *own* AI/API providers directly — that cost never touches Hearth's books.
 
 ---
 
@@ -182,9 +158,6 @@ A user spins up a GPU pod (A10G/A100/H100) on demand in <90 s, leased per-minute
 | WebSocket | native WS (client), `ws` (server) |
 | PTY | node-pty |
 | Server | Node.js 20 + TypeScript (Go control plane later) |
-| Agent CLI | Node.js + OpenAI SDK (`hermes`) |
-| Inference | vLLM, OpenAI-compatible API |
-| Model | NousResearch/Hermes-3-Llama-3.1-8B |
 | Container | Docker → Firecracker/gVisor |
 | Orchestration | Kubernetes (Phase 2+) |
 | Storage | Docker volumes → EFS/S3 |
@@ -195,25 +168,25 @@ A user spins up a GPU pod (A10G/A100/H100) on demand in <90 s, leased per-minute
 
 ## 11. Build Phases
 
-### Phase 1 — A real cloud terminal from any device
+### Phase 1 — A real, fully-capable cloud terminal from any device
 
 - [x] Repo scaffold (spec, README)
 - [x] PWA client: full-screen xterm.js terminal
-- [x] Node terminal bridge: PTY ⇄ WebSocket
-- [x] `hermes` CLI agent (fs/shell/git tools) + stub inference
-- [x] Docker image with `hermes` preinstalled + Compose
+- [x] Node terminal bridge: PTY ⇄ WebSocket, resize, reconnect grace
+- [x] Docker image: capable Linux workspace + bridge
 - [ ] Session persistence and auth
-- [ ] Hosted shared inference pool
+- [ ] Mobile key bar + paste/clipboard
+- [ ] Multiple tabs / concurrent sessions
 
-**Done when:** a developer opens a URL on their phone, gets a real Linux shell, and can run `hermes "…"` (or any CLI) to build and run a program — zero local setup.
+**Done when:** a developer opens a URL on their phone, gets a real Linux shell, installs whatever they want, and works — with zero local setup.
 
-### Phase 2 — GPU from your pocket
+### Phase 2 — More machine on demand
 
-On-demand GPU pod provisioning, metering/billing, larger models, Kubernetes-native scheduling.
+Scale CPU/RAM/GPU up and down from any device; metering/billing; Kubernetes-native scheduling; scale-to-zero.
 
-### Phase 3 — Teams, fine-tuning, self-host
+### Phase 3 — Teams, workspaces, self-host
 
-Multi-user workspaces, fine-tuning job runner, self-hosted enterprise deployments, bring-your-own model.
+Multi-user orgs, multiple persistent workspaces, self-hosted enterprise deployments.
 
 ---
 
@@ -223,10 +196,10 @@ Multi-user workspaces, fine-tuning job runner, self-hosted enterprise deployment
 |------|-----------|------------|
 | PTY latency over WAN | Medium | Delta updates; WebTransport later |
 | Container escape | Low | gVisor/Firecracker; defense in depth |
-| GPU supply / cost | Medium | Multi-provider (RunPod, Lambda, AWS); spot |
-| 8B model quality | Medium | Hermes fine-tune; RAG; easy upgrade path; BYO model |
+| Mobile terminal usability | Medium | Accessory key bar; paste integration; font controls |
 | Mobile browser WS limits | Low | Reconnect + session persistence |
-| Cold-start latency | Medium | Keep-warm pool; "connecting…" UX |
+| Cold-start latency | Medium | Keep-warm pool; "waking…" UX |
+| Abuse (crypto mining, etc.) | Medium | Resource caps; egress limits; per-tier quotas |
 
 ---
 

@@ -1,6 +1,7 @@
 services:
-  # The Hearth terminal bridge + workspace container. The web terminal attaches
-  # to a bash shell in here; `hermes` and the rest of the toolchain live inside.
+  # The Hearth terminal: the bridge + the user's persistent Linux workspace.
+  # The web terminal attaches to a bash shell in here. Everything the user
+  # wants (LLM CLIs, APIs, languages, tools) they install inside it themselves.
   terminal:
     build:
       context: ..
@@ -9,34 +10,9 @@ services:
       - "3001:3001"
     environment:
       PORT: "3001"
-      # The hermes CLI inside the container reads these. STUB needs no model.
-      STUB_INFERENCE: "true"
-      # Point hermes at a real endpoint instead:
-      # STUB_INFERENCE: "false"
-      # INFERENCE_BASE_URL: "http://vllm:8000/v1"
-      # INFERENCE_MODEL: "NousResearch/Hermes-3-Llama-3.1-8B"
     volumes:
-      - hearth-home:/home/hearth
+      - hearth-home:/home/hearth   # persistent home directory across sessions
     restart: unless-stopped
-
-  # Optional: run Hermes locally with vLLM (requires an NVIDIA GPU).
-  # vllm:
-  #   image: vllm/vllm-openai:latest
-  #   command: >
-  #     --model NousResearch/Hermes-3-Llama-3.1-8B
-  #     --dtype auto --max-model-len 8192 --tool-call-parser hermes
-  #   ports:
-  #     - "8000:8000"
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
-  #   volumes:
-  #     - hf-cache:/root/.cache/huggingface
 
 volumes:
   hearth-home:
-  # hf-cache:

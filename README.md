@@ -1,6 +1,6 @@
 # Hearth
 
-**A universal cloud terminal.** Open a browser on any device — a $80 phone, a borrowed laptop, a library PC — and get a real Linux terminal running in the cloud. Everything you'd do from a command line, you do from the web.
+**A universal web terminal.** Open a browser on any device — a $80 phone, a borrowed laptop, a library PC — and get a real, full Linux terminal running in the cloud. Everything a terminal can do, you do from the web.
 
 > An [ENUID Labs](https://github.com/ENUID) product. Build for people.
 
@@ -8,31 +8,32 @@
 
 ## Why
 
-There are ~6.8 billion smartphone users but only ~2 billion personal computers. Development and AI tooling assume you own a capable machine. That assumption excludes most of humanity.
+There are ~6.8 billion smartphone users but only ~2 billion personal computers. Real computing — development, command-line tools, AI CLIs — assumes you own a capable machine. That assumption excludes most of humanity.
 
-Hearth removes the hardware requirement. The computer lives in the cloud; your device is just a window to it. The terminal is the whole interface — and through it you can use everything that already exists on the command line today.
+Hearth removes the hardware requirement. The computer lives in the cloud; your device is just a window to it.
 
-## The idea
+## What Hearth is (and isn't)
 
-A terminal in the browser, wired to a persistent Linux container in the cloud. That's it. Because it's a *real* shell, you use it the way you already use a CLI:
+Hearth is **just the terminal** — the best, most complete web terminal we can build, backed by a real persistent Linux machine. That's the whole product.
+
+It is **not** an AI app, a chat tool, or a curated bundle. It doesn't ship models, agents, or opinions about what you should run. Whatever you want — any LLM CLI, any API, any language, any tool — you install it and pay for it yourself, exactly like you would on your own computer:
 
 ```bash
-$ python app.py
-$ git clone … && cd … && npm install
-$ pip install <anything>
-$ ollama run llama3
-$ hermes "build me a fastapi app and run it"   # ← AI is just a command
-$ aider                                         # ← so is any other agent
+$ pip install aider-chat        # bring any AI CLI you like
+$ npm i -g @anthropic-ai/claude-code
+$ curl https://api.openai.com/… # use any API with your own key
+$ ollama run llama3             # run a model yourself
+$ git clone … && cargo build    # or just… do normal computer things
 ```
 
-**AI agents are not a special feature — they're CLI tools you run in the terminal.** Hearth ships one (`hermes`) preinstalled so there's something useful on day one, but you can install any other agent and use it exactly the same way. The terminal is the platform; agents are apps on it.
+Hearth gives you the computer and the terminal. What runs on it is entirely yours.
 
 ## Principles
 
-- **The terminal is the product.** Not a chat box with a terminal bolted on — a real shell, first.
-- **Device-agnostic, web-first.** Runs in any modern browser as a PWA.
-- **Real, not a toy.** Genuine Linux, persistent filesystem, real packages and git.
-- **Open by default.** Bring any CLI, any agent, any model. Nothing is locked in.
+- **Just the terminal.** A real shell on a real Linux box. Nothing bundled, nothing in the way.
+- **Maximally capable.** Whatever a Linux terminal can do — interactive programs, colors, editors, long-running processes, package installs — works here.
+- **Device-agnostic, web-first.** Runs in any modern browser as an installable PWA.
+- **Yours.** Persistent filesystem, your tools, your keys, your bill. We don't sit between you and what you run.
 
 ## What's in this repo
 
@@ -40,26 +41,22 @@ $ aider                                         # ← so is any other agent
 |------|-----------|
 | `client/` | React 19 + Vite PWA. A full-screen xterm.js terminal over a WebSocket. |
 | `server/` | Node.js terminal bridge: WebSocket ⇄ PTY (`node-pty`) in the container. |
-| `hermes-cli/` | The `hermes` AI agent as a CLI — preinstalled in the container, run from the terminal. |
-| `docker/` | Container image (bridge + toolchain + `hermes`) and Compose setup. |
+| `docker/` | The container image (a capable Linux workspace) and Compose setup. |
 | `docs/hearth-spec.md` | Full technical spec. |
 
 ## Run it
 
 ```bash
-# 1. install deps for all packages
+# install deps for both packages
 npm install && npm run install:all
 
-# 2. dev mode (client + terminal bridge with live reload)
+# dev mode (client + terminal bridge with live reload)
 npm run dev
 # client →  http://localhost:5173
 # bridge →  ws://localhost:3001/pty
-
-# try the agent CLI directly (mock model, no endpoint needed):
-STUB_INFERENCE=true npm run dev --prefix hermes-cli -- "hello"
 ```
 
-For the full containerized experience (terminal + `hermes` preinstalled on PATH):
+For the full containerized experience (terminal + persistent Linux workspace):
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build
@@ -67,17 +64,17 @@ docker compose -f docker/docker-compose.yml up --build
 
 ## Status
 
-🚧 Early development — **Phase 1 vertical slice**: browser terminal → WebSocket → persistent container, with `hermes` preinstalled as the first CLI agent. Inference runs in stub mode out of the box; point it at a real Hermes endpoint to go live.
+🚧 Early development — **Phase 1 vertical slice**: browser terminal → WebSocket → persistent Linux container. Real shell, real filesystem, install anything.
 
 ### Roadmap
 
-- **Phase 1** — A real cloud terminal from any device, with CLI agents available inside it.
-- **Phase 2** — Spin up a GPU on demand from your pocket (on-demand, scale-to-zero) for heavier models.
-- **Phase 3** — Fine-tuning, teams, and self-host.
+- **Phase 1** — A real, fully-capable cloud terminal from any device.
+- **Phase 2** — A more powerful machine on demand: scale up CPU/RAM/GPU from your pocket when you need it, scale to zero when you don't.
+- **Phase 3** — Teams, multiple workspaces, and self-host.
 
 ## Tech
 
-React 19 + Vite (PWA) · xterm.js · WebSocket · node-pty · Docker → Firecracker/gVisor · OpenAI-compatible inference (vLLM) · Hermes.
+React 19 + Vite (PWA) · xterm.js · WebSocket · node-pty · Docker → Firecracker/gVisor.
 
 ---
 
