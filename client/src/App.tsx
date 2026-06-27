@@ -1,34 +1,48 @@
-import { useState, useCallback } from "react";
-import Layout from "./components/Layout";
 import Terminal from "./components/Terminal";
-import ChatPane from "./components/ChatPane";
 import { usePtySocket } from "./hooks/usePtySocket";
-import { useAgentSocket } from "./hooks/useAgentSocket";
 
 const SESSION_ID = "dev-session";
 
 export default function App() {
-  const [activePane, setActivePane] = useState<"terminal" | "chat">("terminal");
-
   const pty = usePtySocket(SESSION_ID);
-  const agent = useAgentSocket(SESSION_ID);
-
-  const handleSendMessage = useCallback(
-    (text: string) => {
-      agent.send(text);
-      setActivePane("chat");
-    },
-    [agent]
-  );
 
   return (
-    <Layout activePane={activePane} onPaneChange={setActivePane}>
-      <Layout.Chat>
-        <ChatPane messages={agent.messages} onSend={handleSendMessage} status={agent.status} />
-      </Layout.Chat>
-      <Layout.Terminal>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+      {/* header */}
+      <div
+        style={{
+          height: 38,
+          display: "flex",
+          alignItems: "center",
+          padding: "0 14px",
+          gap: 10,
+          borderBottom: "1px solid var(--border)",
+          background: "var(--surface)",
+          flexShrink: 0,
+        }}
+      >
+        <span
+          style={{
+            fontWeight: 700,
+            color: "var(--accent)",
+            letterSpacing: "-0.02em",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          hearth
+        </span>
+        <span style={{ color: "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-mono)" }}>
+          {SESSION_ID}
+        </span>
+        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontSize: 11 }}>
+          tip: run <code style={{ color: "var(--accent)" }}>hermes "…"</code> for the AI agent
+        </span>
+      </div>
+
+      {/* terminal fills the rest */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
         <Terminal ptySocket={pty} />
-      </Layout.Terminal>
-    </Layout>
+      </div>
+    </div>
   );
 }

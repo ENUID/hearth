@@ -1,7 +1,7 @@
-version: "3.9"
-
 services:
-  server:
+  # The Hearth terminal bridge + workspace container. The web terminal attaches
+  # to a bash shell in here; `hermes` and the rest of the toolchain live inside.
+  terminal:
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -9,8 +9,9 @@ services:
       - "3001:3001"
     environment:
       PORT: "3001"
+      # The hermes CLI inside the container reads these. STUB needs no model.
       STUB_INFERENCE: "true"
-      # Set these to connect a real Hermes endpoint:
+      # Point hermes at a real endpoint instead:
       # STUB_INFERENCE: "false"
       # INFERENCE_BASE_URL: "http://vllm:8000/v1"
       # INFERENCE_MODEL: "NousResearch/Hermes-3-Llama-3.1-8B"
@@ -18,14 +19,12 @@ services:
       - hearth-home:/home/hearth
     restart: unless-stopped
 
-  # Uncomment to run vLLM with Hermes (requires GPU):
+  # Optional: run Hermes locally with vLLM (requires an NVIDIA GPU).
   # vllm:
   #   image: vllm/vllm-openai:latest
   #   command: >
   #     --model NousResearch/Hermes-3-Llama-3.1-8B
-  #     --dtype auto
-  #     --max-model-len 8192
-  #     --tool-call-parser hermes
+  #     --dtype auto --max-model-len 8192 --tool-call-parser hermes
   #   ports:
   #     - "8000:8000"
   #   deploy:

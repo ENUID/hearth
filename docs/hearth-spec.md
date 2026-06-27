@@ -1,336 +1,232 @@
 # Hearth — Technical Specification
 
-> Version: 0.1 (Phase 1 draft) · ENUID Labs
+> Version: 0.2 (Phase 1 draft) · ENUID Labs
 
 ---
 
 ## 1. Mission
 
-Remove the hardware requirement from software development and AI work. The computer lives in the cloud; the device is just a window. An $80 phone should be a full development and AI workstation.
+Remove the hardware requirement from computing. The computer lives in the cloud; the device is just a window. An $80 phone should be a full Linux workstation through the browser.
+
+## 2. The shape of the product
+
+Hearth is **a cloud terminal**, not an AI chat app. The terminal is the entire interface. Because it's a real shell on a real Linux container, anything that exists on the command line today works — including AI.
+
+**Agents are CLI tools, not a built-in feature.** Hearth ships one agent (`hermes`) preinstalled so there's value on first launch, but it lives on `PATH` like any other command. Users can install other agents (`aider`, etc.) or models (`ollama`) and use them identically. This keeps the platform open and keeps the surface area small: Hearth maintains a terminal, not an opinion about which AI you use.
 
 ---
 
-## 2. Architecture Overview
+## 3. Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Client (Browser PWA)                                           │
-│                                                                 │
-│   ┌───────────────┐  ┌───────────────┐  ┌──────────────────┐   │
-│   │  xterm.js     │  │  Chat pane    │  │  Editor pane     │   │
-│   │  (PTY mirror) │  │  (agent UI)   │  │  (CodeMirror 6)  │   │
-│   └──────┬────────┘  └──────┬────────┘  └──────────────────┘   │
-│          │                  │                                   │
-│   WS /pty (binary)   WS /agent (JSON)                          │
-└──────────┼──────────────────┼───────────────────────────────────┘
-           │                  │
-┌──────────▼──────────────────▼───────────────────────────────────┐
-│  Control Plane (Node.js / Go)                                   │
-│                                                                 │
-│   PTY bridge (node-pty)      Agent handler                      │
-│   ─────────────────────      ─────────────────────────────────  │
-│   spawn /bin/bash            receive message                    │
-│   pipe stdin/stdout          → Hermes agent loop                │
-│   resize events              → tool dispatch                    │
-│                              → stream tokens back               │
-└─────────────────────────────────┬───────────────────────────────┘
-                                  │
-              ┌───────────────────┼────────────────────┐
-              │                   │                    │
-     ┌────────▼──────┐  ┌─────────▼──────┐  ┌────────▼────────┐
-     │  Filesystem   │  │  Shell runner  │  │  Inference API  │
-     │  (fs read/    │  │  (exec in ctr) │  │  (vLLM /       │
-     │   write)      │  │               │  │   shared pool)  │
-     └───────────────┘  └───────────────┘  └─────────────────┘
+┌──────────────────────────────────────────────┐
+│  Client (Browser PWA)                         │
+│   ┌────────────────────────────────────────┐ │
+│   │  xterm.js — full-screen terminal       │ │
+│   └────────────────────────────────────────┘ │
+│              │  WS /pty (binary)              │
+└──────────────┼─────────────────────────────────┘
+               │
+┌──────────────▼─────────────────────────────────┐
+│  Terminal bridge (Node.js)                     │
+│   spawn /bin/bash · pipe stdin/stdout · resize │
+└──────────────┬─────────────────────────────────┘
+               │ PTY
+┌──────────────▼─────────────────────────────────┐
+│  Container (persistent Linux)                  │
+│   bash + toolchain (git, python, node, curl)   │
+│   ├── hermes        ← preinstalled CLI agent   │
+│   ├── aider / etc.  ← user-installed agents    │
+│   └── any CLI / model the user installs        │
+│                                                │
+│   hermes ──► OpenAI-compatible inference API   │
+│             (shared vLLM pool / stub / BYO)    │
+└────────────────────────────────────────────────┘
 ```
 
-### 2.1 Component Responsibilities
+The bridge is deliberately thin: it moves bytes between the browser and a PTY. It knows nothing about AI. The agent (`hermes`) runs *inside* the container as a subprocess of the user's shell, and it — not the server — talks to the inference endpoint.
+
+### 3.1 Component Responsibilities
 
 | Component | Technology | Role |
 |-----------|-----------|------|
-| PWA Client | React 19 + Vite + xterm.js | Browser UI, terminal mirror, chat |
-| PTY Bridge | node-pty (Node.js) | Spawn/manage shell sessions |
-| Agent Handler | Node.js TypeScript | Route WS messages → agent loop |
-| Hermes Agent Loop | TypeScript + OpenAI-compat client | Tool-calling loop over inference |
-| Inference Backend | vLLM (Phase 2+) / stub (Phase 1) | Host NousResearch/Hermes model |
-| Container Runtime | Docker (dev) → Firecracker/gVisor (prod) | Isolation per session |
-| Persistence | Volume mount (dev) → S3/EFS (prod) | Home directory across sessions |
+| PWA Client | React 19 + Vite + xterm.js | Full-screen browser terminal |
+| Terminal Bridge | Node.js + `node-pty` + `ws` | WebSocket ⇄ PTY; session lifecycle |
+| Container | Docker → Firecracker/gVisor | The actual Linux machine |
+| `hermes` CLI | Node.js + OpenAI-compat client | Shipped agent; runs in the terminal |
+| Inference Backend | vLLM (shared) / stub / BYO | Hosts the model `hermes` calls |
+| Persistence | Volume mount (dev) → EFS/S3 | Home directory across sessions |
 
 ---
 
-## 3. Client (PWA)
+## 4. Client (PWA)
 
-### 3.1 Layout
+A single full-screen terminal. No chat pane, no editor chrome — the shell is the UI.
 
-Three-pane layout, collapsible on mobile:
-
-```
-┌──────────────┬──────────────────────────────┐
-│  Chat pane   │  Terminal                    │
-│  (agent UI)  │  (xterm.js, full PTY)        │
-│              ├──────────────────────────────│
-│              │  Editor (CodeMirror 6)       │
-│              │  (Phase 1: optional/hidden)  │
-└──────────────┴──────────────────────────────┘
-```
-
-On small screens (phone), chat and terminal stack vertically with a tab bar to switch.
-
-### 3.2 PWA Requirements
-
-- `manifest.json` with `display: standalone`
-- Service worker (Vite PWA plugin) for offline shell of the UI
-- Theme color, icons for home-screen install
-- Viewport meta for mobile
-
-### 3.3 Terminal (xterm.js)
-
-- Binary WebSocket to `/pty` — raw PTY bytes, no encoding
-- `FitAddon` to resize terminal to container element
-- Resize events sent as JSON frame over the same WS: `{"type":"resize","cols":N,"rows":N}`
-- `WebLinksAddon` for clickable URLs
-
-### 3.4 Agent Chat
-
-- JSON WebSocket to `/agent`
-- Message types:
-  - `{type: "user", content: string}` — user turn
-  - `{type: "token", content: string}` — streamed assistant token
-  - `{type: "tool_call", name: string, args: object}` — tool being executed
-  - `{type: "tool_result", name: string, result: string}` — tool output
-  - `{type: "done"}` — assistant turn complete
-  - `{type: "error", message: string}` — error
+- **Terminal:** `@xterm/xterm` with `FitAddon` (resize to viewport) and `WebLinksAddon` (clickable URLs).
+- **Transport:** binary WebSocket to `/pty`. Raw PTY bytes in both directions; resize sent as a JSON control frame `{"type":"resize","cols":N,"rows":N}` on the same socket.
+- **Reconnect:** auto-reconnect with backoff; the server keeps the PTY alive briefly so a dropped phone connection doesn't kill the session.
+- **PWA:** `manifest.json` (`display: standalone`), service worker for the app shell, installable to the home screen, mobile viewport with `viewport-fit=cover`.
 
 ---
 
-## 4. Server
-
-### 4.1 PTY Handler
+## 5. Terminal Bridge (Server)
 
 ```
-POST /sessions        → create session, return session_id
-WS   /pty?sid=<id>   → attach PTY
+GET  /health          → liveness
+WS   /pty?sid=<id>    → attach a PTY
 ```
 
 On WS connect:
-1. Spawn `node-pty` shell (`/bin/bash` or `$SHELL`) with env from session
-2. Pipe PTY output → WS as binary frames
-3. Pipe WS binary frames → PTY stdin
-4. Handle `{"type":"resize","cols":N,"rows":N}` JSON frames specially
-5. On WS close: keep PTY alive for reconnect (30 s grace, then kill)
+1. Look up or create the session's PTY (`node-pty` spawning `$SHELL` / `/bin/bash`).
+2. Pipe PTY output → WS as binary frames.
+3. Pipe WS binary frames → PTY stdin.
+4. Intercept `{"type":"resize",...}` JSON frames and resize the PTY.
+5. On WS close: keep the PTY alive for a grace window (reconnect), then reap.
 
-### 4.2 Agent Handler
-
-```
-WS /agent?sid=<id>   → agent session
-```
-
-On WS message:
-1. Parse `{type: "user", content}` turn
-2. Append to message history
-3. Start Hermes agent loop (section 5)
-4. Stream tokens and tool events back over WS
-5. Append final assistant message to history
+That's the entire server responsibility. No agent logic lives here.
 
 ---
 
-## 5. Hermes Agent Loop
+## 6. Agents as CLI tools
 
-Hearth's AI is built on [NousResearch Hermes](https://github.com/NousResearch/hermes-agent), a tool-calling model fine-tuned on function use.
+### 6.1 Model
 
-### 5.1 System Prompt
+An agent in Hearth is just a program on `PATH`. It reads a task, does work in the current directory (files, shell, git), and prints results. This is the normal CLI contract, so every existing terminal agent already fits.
 
+### 6.2 The shipped agent: `hermes`
+
+`hermes-cli` is built on [NousResearch Hermes](https://github.com/NousResearch/hermes-agent), a tool-calling fine-tune. It is `npm install -g`'d into the container image so `hermes` is available immediately.
+
+```bash
+hermes "write a fastapi hello-world and run it"   # one-shot
+hermes                                            # interactive session
+echo "summarize README.md" | hermes               # stdin
 ```
-You are Hearth, a powerful AI agent running inside a cloud Linux environment.
-You can read/write files, run shell commands, and manage the user's workspace.
-Always think step by step. Use tools to get real information rather than guessing.
-The user's home directory is /home/hearth. You are their pair programmer and operator.
-```
 
-### 5.2 Tool Registry (Phase 1)
+**Tools** (operate relative to the current working directory):
 
 | Tool | Description |
 |------|-------------|
-| `fs_read` | Read a file; returns content or error |
-| `fs_write` | Write/overwrite a file |
-| `fs_list` | List directory contents |
-| `shell_run` | Execute shell command, return stdout/stderr/exit |
-| `git_status` | Git status in a directory |
-| `git_diff` | Git diff (staged or unstaged) |
-| `git_commit` | Stage all and commit with message |
+| `fs_read` / `fs_write` / `fs_list` | File operations |
+| `shell_run` | Execute a shell command (returns stdout+stderr) |
+| `git_status` / `git_diff` / `git_commit` | Git operations |
 
-### 5.3 Loop Algorithm
+**Loop:**
 
 ```
-messages = [system] + history + [new user message]
-
-loop:
-  response = inference.chat(messages, tools=TOOLS, stream=true)
-  stream tokens to client as {type:"token"}
-
-  if response.finish_reason == "tool_calls":
-    for each tool_call in response.tool_calls:
-      send {type:"tool_call", name, args} to client
-      result = dispatch(tool_call.name, tool_call.args)
-      send {type:"tool_result", name, result} to client
-      messages.append(tool_result message)
-    continue loop
-
-  if response.finish_reason == "stop":
-    send {type:"done"}
-    break
+messages = [system] + history
+loop (max N):
+  stream completion (tools enabled) → print tokens to stdout
+  if finish_reason == "tool_calls":
+    for each call: run tool, print activity, append result
+    continue
+  else: append assistant message, return
 ```
 
-### 5.4 Tool Execution Sandboxing
+**Inference client** speaks OpenAI Chat Completions (`POST /v1/chat/completions`). Configured by env (`INFERENCE_BASE_URL`, `INFERENCE_MODEL`, `INFERENCE_API_KEY`). `STUB_INFERENCE=true` gives a deterministic mock so the CLI is usable with no model running.
 
-Phase 1 (dev): tools run in the same process as the server, within the container.
+### 6.3 Safety
 
-Phase 2+: tools run inside a gVisor-isolated microVM per session. Shell commands are limited to the session's mount namespace. Network access is controlled by policy.
-
-### 5.5 Inference Client
-
-The inference client speaks the OpenAI Chat Completions API (`POST /v1/chat/completions`).
-
-Configuration (env vars):
-```
-INFERENCE_BASE_URL   = http://localhost:8000/v1   (vLLM endpoint)
-INFERENCE_MODEL      = NousResearch/Hermes-3-Llama-3.1-8B
-INFERENCE_API_KEY    = none                        (no auth for self-hosted)
-```
-
-For Phase 1 development without a running model, set `STUB_INFERENCE=true` to get a deterministic mock response.
+`shell_run` enforces a timeout and an output cap, and pattern-blocks obviously destructive system-level commands (e.g. `rm -rf /`, `mkfs`, fork bombs). The agent runs with the user's own permissions inside the user's own container — the real isolation boundary is the container itself (section 8), not the agent.
 
 ---
 
-## 6. GPU / Inference Economics
+## 7. GPU / Inference Economics
 
-### 6.1 Shared Pool (Always-On, Phase 1)
+### 7.1 Shared pool (Phase 1)
 
-- A small cluster of shared vLLM instances hosts Hermes 8B
-- All free-tier users share capacity; queuing via request batching in vLLM
-- Cost per token is low at 8B scale; shared across all concurrent users
-- No GPU cost to the user; covered by Hearth's baseline SaaS margin
+A small cluster of shared vLLM instances hosts Hermes 8B. Free-tier users share capacity via vLLM request batching. Per-token cost at 8B scale is low and amortized across concurrent users; covered by baseline SaaS margin. `hermes` points here by default.
 
-### 6.2 Dedicated GPU Pods (Phase 2)
+### 7.2 Dedicated GPU pods (Phase 2)
 
-- User triggers `gpu.provision()` from the agent or UI
-- A GPU pod (A10G, A100, H100) spins up in <90 s on a Kubernetes cluster
-- Pod is leased per-minute; scale-to-zero after idle timeout
-- Larger models (70B, 405B) or user's own fine-tuned weights run here
-- Revenue model: pass-through GPU cost + margin; no GPU ownership
+A user spins up a GPU pod (A10G/A100/H100) on demand in <90 s, leased per-minute, scale-to-zero after idle. Larger models (70B/405B) or the user's own weights run here. Revenue = pass-through GPU cost + margin; Hearth owns no GPUs.
 
-### 6.3 Cost Model (estimates)
+### 7.3 Cost model (estimates)
 
 | Tier | Inference | Container | GPU |
 |------|-----------|-----------|-----|
-| Free | Shared 8B | Always-on 0.5 vCPU, 1 GB | None |
-| Pro $20/mo | Shared 8B priority | 2 vCPU, 4 GB | 5 GPU-hrs/mo included |
-| GPU on-demand | Same | Same | ~$0.80–3.50/hr depending on GPU |
+| Free | Shared 8B | Always-on 0.5 vCPU / 1 GB | None |
+| Pro $20/mo | Shared 8B, priority | 2 vCPU / 4 GB | 5 GPU-hrs/mo included |
+| GPU on-demand | — | — | ~$0.80–3.50/hr by GPU |
 
 ---
 
-## 7. Security Model
+## 8. Security Model
 
-### 7.1 Session Isolation
-
-- Each user gets an isolated Linux container (cgroups, namespaces)
-- Phase 1: Docker with resource limits; Phase 2+: Firecracker microVMs
-- No network access between containers
-- Agent tool execution is always inside the user's own container
-
-### 7.2 Authentication
-
-- Phase 1: JWT-based sessions; tokens passed as `?token=` on WS connect
-- Phase 2: Passkey / OAuth (GitHub, Google)
-
-### 7.3 Tool Safety
-
-- `shell_run` uses a configurable timeout (default 30 s)
-- `shell_run` enforces a cgroup memory cap
-- `fs_write` is scoped to the session home directory (path traversal blocked)
-- Dangerous patterns (e.g., `rm -rf /`) are pattern-matched and require confirmation
-
-### 7.4 Network
-
-- TLS everywhere; WebSocket over WSS in production
-- PTY traffic is end-to-end between browser and container; server is a relay
-- Inference API calls are server-side only; inference keys never reach the browser
+- **Session isolation:** one Linux container per user (cgroups, namespaces); Phase 1 Docker with resource limits, Phase 2+ Firecracker/gVisor microVMs. No inter-container network.
+- **The container is the trust boundary.** The agent and any user-installed CLI run inside it with the user's permissions; nothing they do escapes the sandbox.
+- **Auth:** Phase 1 JWT passed on WS connect; Phase 2 passkeys / OAuth.
+- **Transport:** WSS everywhere. PTY traffic is relayed browser ⇄ container. Inference API keys live in the container/server, never in the browser.
 
 ---
 
-## 8. Business Model
+## 9. Business Model
 
 | Stream | Mechanism |
-|--------|----------|
-| SaaS subscription | Free / Pro tiers; Pro for power users |
-| GPU usage metering | Pass-through + margin on on-demand GPU pods |
-| Enterprise / self-host | License + support for on-prem deployments |
-| Fine-tuning jobs | Metered GPU time for fine-tuning runs (Phase 3) |
+|--------|-----------|
+| SaaS subscription | Free / Pro tiers |
+| GPU metering | Pass-through + margin on on-demand pods |
+| Enterprise / self-host | License + support for on-prem |
+| Fine-tuning jobs | Metered GPU time (Phase 3) |
 
 ---
 
-## 9. Tech Stack (Full)
+## 10. Tech Stack
 
-| Layer | Technology | Notes |
-|-------|-----------|-------|
-| Client UI | React 19, Vite 5, TypeScript | |
-| PWA | vite-plugin-pwa, Workbox | Offline shell, home-screen install |
-| Terminal | @xterm/xterm v5 | With FitAddon, WebLinksAddon |
-| Editor | CodeMirror 6 | Phase 1: hidden/optional |
-| WebSocket | Native WS API (client), `ws` (server) | |
-| PTY | node-pty | Maps WS to OS PTY |
-| Server runtime | Node.js 20 + TypeScript | Potential Go rewrite for control plane |
-| Inference | vLLM, OpenAI-compat API | |
-| Model | NousResearch/Hermes-3-Llama-3.1-8B | Tool-calling fine-tune |
-| Container | Docker → Firecracker/gVisor | |
-| Orchestration | Kubernetes (Phase 2+) | |
-| Storage | Docker volumes → EFS/S3 | |
-| Auth | JWT → Passkeys | |
-| CI/CD | GitHub Actions | |
+| Layer | Technology |
+|-------|-----------|
+| Client | React 19, Vite 6, TypeScript |
+| PWA | vite-plugin-pwa / Workbox |
+| Terminal | @xterm/xterm v5 (+ FitAddon, WebLinksAddon) |
+| WebSocket | native WS (client), `ws` (server) |
+| PTY | node-pty |
+| Server | Node.js 20 + TypeScript (Go control plane later) |
+| Agent CLI | Node.js + OpenAI SDK (`hermes`) |
+| Inference | vLLM, OpenAI-compatible API |
+| Model | NousResearch/Hermes-3-Llama-3.1-8B |
+| Container | Docker → Firecracker/gVisor |
+| Orchestration | Kubernetes (Phase 2+) |
+| Storage | Docker volumes → EFS/S3 |
+| Auth | JWT → passkeys |
+| CI/CD | GitHub Actions |
 
 ---
 
-## 10. Build Phases
+## 11. Build Phases
 
-### Phase 1 — Code from any device
+### Phase 1 — A real cloud terminal from any device
 
-Deliverables:
-- [x] Repository scaffold (this spec, README)
-- [ ] PWA client with xterm.js terminal + chat pane
-- [ ] Node.js server with PTY WebSocket bridge
-- [ ] Hermes agent loop with fs/shell tools
-- [ ] Shared inference integration (or stub)
-- [ ] Docker Compose dev setup
-- [ ] Session management (in-memory, Phase 1)
+- [x] Repo scaffold (spec, README)
+- [x] PWA client: full-screen xterm.js terminal
+- [x] Node terminal bridge: PTY ⇄ WebSocket
+- [x] `hermes` CLI agent (fs/shell/git tools) + stub inference
+- [x] Docker image with `hermes` preinstalled + Compose
+- [ ] Session persistence and auth
+- [ ] Hosted shared inference pool
 
-Definition of done: A developer can open a URL on their phone, get a real Linux shell, and ask the AI agent to write and run a Python script — with zero local setup.
+**Done when:** a developer opens a URL on their phone, gets a real Linux shell, and can run `hermes "…"` (or any CLI) to build and run a program — zero local setup.
 
 ### Phase 2 — GPU from your pocket
 
-- On-demand GPU pod provisioning API
-- GPU billing / metering
-- Larger model support (70B+)
-- Kubernetes-native session scheduling
+On-demand GPU pod provisioning, metering/billing, larger models, Kubernetes-native scheduling.
 
 ### Phase 3 — Teams, fine-tuning, self-host
 
-- Multi-user workspaces
-- Fine-tuning job runner
-- Self-hosted enterprise deployment
-- Bring-your-own model
+Multi-user workspaces, fine-tuning job runner, self-hosted enterprise deployments, bring-your-own model.
 
 ---
 
-## 11. Risks and Mitigations
+## 12. Risks and Mitigations
 
 | Risk | Likelihood | Mitigation |
 |------|-----------|------------|
-| PTY latency over WAN | Medium | Delta compression; WebTransport (future) |
+| PTY latency over WAN | Medium | Delta updates; WebTransport later |
 | Container escape | Low | gVisor/Firecracker; defense in depth |
 | GPU supply / cost | Medium | Multi-provider (RunPod, Lambda, AWS); spot |
-| Model quality (8B) | Medium | Hermes fine-tune; RAG for context; upgrade path |
+| 8B model quality | Medium | Hermes fine-tune; RAG; easy upgrade path; BYO model |
 | Mobile browser WS limits | Low | Reconnect + session persistence |
-| Cold-start latency | Medium | Keep-warm pool; stream "connecting…" UX |
+| Cold-start latency | Medium | Keep-warm pool; "connecting…" UX |
 
 ---
 

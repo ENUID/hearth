@@ -1,23 +1,23 @@
 {
-  "name": "hearth-server",
+  "name": "@hearth/hermes-cli",
   "version": "0.1.0",
-  "private": true,
+  "description": "Hermes AI agent as a CLI — run it inside any terminal",
+  "license": "MIT",
   "type": "commonjs",
+  "bin": {
+    "hermes": "dist/cli.js"
+  },
+  "files": ["dist"],
   "scripts": {
-    "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "dev": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "node-pty": "^1.0.0",
-    "ws": "^8.18.0"
+    "openai": "^4.77.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
     "@types/node": "^22.10.5",
-    "@types/ws": "^8.5.13",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

@@ -35,7 +35,6 @@ export default defineConfig({
   server: {
     proxy: {
       "/pty": { target: "ws://localhost:3001", ws: true },
-      "/agent": { target: "ws://localhost:3001", ws: true },
       "/api": { target: "http://localhost:3001" },
     },
   },

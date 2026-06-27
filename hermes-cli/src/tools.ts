@@ -5,75 +5,69 @@ import path from "path";
 
 const execAsync = promisify(exec);
 
-const HOME = process.env.HOME ?? "/home/hearth";
-
-function resolveSafe(filePath: string): string {
-  const resolved = path.resolve(HOME, filePath.startsWith("/") ? filePath.slice(1) : filePath);
-  if (!resolved.startsWith(HOME)) {
-    throw new Error(`Path '${filePath}' is outside the allowed directory`);
-  }
-  return resolved;
+// The CLI runs inside the user's own terminal session, so it operates relative
+// to the current working directory — just like any other command-line tool.
+function resolve(p: string): string {
+  return path.resolve(process.cwd(), p);
 }
 
 async function fsRead(args: { path: string }): Promise<string> {
-  const target = resolveSafe(args.path);
-  const content = await readFile(target, "utf8");
-  return content;
+  return readFile(resolve(args.path), "utf8");
 }
 
 async function fsWrite(args: { path: string; content: string }): Promise<string> {
-  const target = resolveSafe(args.path);
+  const target = resolve(args.path);
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, args.content, "utf8");
-  return `Written ${target}`;
+  return `Wrote ${args.content.length} bytes to ${args.path}`;
 }
 
 async function fsList(args: { path?: string }): Promise<string> {
-  const target = resolveSafe(args.path ?? ".");
-  const entries = await readdir(target, { withFileTypes: true });
+  const dir = resolve(args.path ?? ".");
+  const entries = await readdir(dir, { withFileTypes: true });
   const lines = await Promise.all(
     entries.map(async (e) => {
-      const s = await stat(path.join(target, e.name)).catch(() => null);
+      const s = await stat(path.join(dir, e.name)).catch(() => null);
       const size = s ? `${s.size}` : "?";
       const suffix = e.isDirectory() ? "/" : "";
       return `${e.isDirectory() ? "d" : "-"} ${size.padStart(8)} ${e.name}${suffix}`;
     })
   );
-  return lines.join("\n");
+  return lines.join("\n") || "(empty)";
 }
 
-const TIMEOUT_MS = 30_000;
-const DANGEROUS = /\brm\s+-rf\s+\/|\bdd\s+.*of=\/dev\/(sd|nvme|hd)/;
+const TIMEOUT_MS = 60_000;
+const DANGEROUS = /\brm\s+-rf\s+\/(?!\w)|\bdd\s+.*of=\/dev\/(sd|nvme|hd)|\bmkfs\b|:\(\)\s*\{/;
 
 async function shellRun(args: { command: string; cwd?: string }): Promise<string> {
   if (DANGEROUS.test(args.command)) {
-    throw new Error("Command blocked: potentially destructive system-level operation");
+    throw new Error("Command blocked: looks destructive at the system level. Run it yourself if you really mean it.");
   }
-  const cwd = args.cwd ? resolveSafe(args.cwd) : HOME;
   const { stdout, stderr } = await execAsync(args.command, {
-    cwd,
+    cwd: args.cwd ? resolve(args.cwd) : process.cwd(),
     timeout: TIMEOUT_MS,
-    maxBuffer: 1024 * 512,
-    env: { ...process.env, HOME },
+    maxBuffer: 1024 * 1024,
   });
   const out = [stdout, stderr].filter(Boolean).join("\n").trim();
   return out || "(no output)";
 }
 
-async function gitStatus(args: { cwd?: string }): Promise<string> {
-  return shellRun({ command: "git status --short", cwd: args.cwd });
+async function gitStatus(): Promise<string> {
+  return shellRun({ command: "git status --short --branch" });
 }
 
-async function gitDiff(args: { cwd?: string; staged?: boolean }): Promise<string> {
-  const flag = args.staged ? "--staged" : "";
-  return shellRun({ command: `git diff ${flag}`.trim(), cwd: args.cwd });
+async function gitDiff(args: { staged?: boolean }): Promise<string> {
+  return shellRun({ command: `git diff ${args.staged ? "--staged" : ""}`.trim() });
 }
 
-async function gitCommit(args: { message: string; cwd?: string }): Promise<string> {
-  return shellRun({ command: `git add -A && git commit -m ${JSON.stringify(args.message)}`, cwd: args.cwd });
+async function gitCommit(args: { message: string }): Promise<string> {
+  return shellRun({ command: `git add -A && git commit -m ${JSON.stringify(args.message)}` });
 }
 
-export type ToolName = "fs_read" | "fs_write" | "fs_list" | "shell_run" | "git_status" | "git_diff" | "git_commit";
+export type ToolName =
+  | "fs_read" | "fs_write" | "fs_list"
+  | "shell_run"
+  | "git_status" | "git_diff" | "git_commit";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function dispatchTool(name: ToolName, args: Record<string, any>): Promise<string> {
@@ -82,9 +76,9 @@ export async function dispatchTool(name: ToolName, args: Record<string, any>): P
     case "fs_write":   return fsWrite(args as { path: string; content: string });
     case "fs_list":    return fsList(args as { path?: string });
     case "shell_run":  return shellRun(args as { command: string; cwd?: string });
-    case "git_status": return gitStatus(args as { cwd?: string });
-    case "git_diff":   return gitDiff(args as { cwd?: string; staged?: boolean });
-    case "git_commit": return gitCommit(args as { message: string; cwd?: string });
+    case "git_status": return gitStatus();
+    case "git_diff":   return gitDiff(args as { staged?: boolean });
+    case "git_commit": return gitCommit(args as { message: string });
     default: throw new Error(`Unknown tool: ${name as string}`);
   }
 }
@@ -97,7 +91,7 @@ export const TOOL_DEFINITIONS = [
       description: "Read the contents of a file",
       parameters: {
         type: "object",
-        properties: { path: { type: "string", description: "File path (relative to home or absolute)" } },
+        properties: { path: { type: "string", description: "File path (relative to the current directory)" } },
         required: ["path"],
       },
     },
@@ -106,7 +100,7 @@ export const TOOL_DEFINITIONS = [
     type: "function",
     function: {
       name: "fs_write",
-      description: "Write content to a file (creates directories as needed)",
+      description: "Write content to a file (creates parent directories as needed)",
       parameters: {
         type: "object",
         properties: {
@@ -124,7 +118,7 @@ export const TOOL_DEFINITIONS = [
       description: "List files and directories",
       parameters: {
         type: "object",
-        properties: { path: { type: "string", description: "Directory path (default: home)" } },
+        properties: { path: { type: "string", description: "Directory path (default: current directory)" } },
         required: [],
       },
     },
@@ -133,7 +127,7 @@ export const TOOL_DEFINITIONS = [
     type: "function",
     function: {
       name: "shell_run",
-      description: "Run a shell command in the container. Returns stdout+stderr.",
+      description: "Run a shell command in the current directory. Returns stdout+stderr.",
       parameters: {
         type: "object",
         properties: {
@@ -149,11 +143,7 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: "git_status",
       description: "Show git status (short format)",
-      parameters: {
-        type: "object",
-        properties: { cwd: { type: "string" } },
-        required: [],
-      },
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
@@ -163,10 +153,7 @@ export const TOOL_DEFINITIONS = [
       description: "Show git diff (unstaged by default)",
       parameters: {
         type: "object",
-        properties: {
-          cwd: { type: "string" },
-          staged: { type: "boolean", description: "Show staged diff" },
-        },
+        properties: { staged: { type: "boolean", description: "Show staged diff" } },
         required: [],
       },
     },
@@ -178,10 +165,7 @@ export const TOOL_DEFINITIONS = [
       description: "Stage all changes and commit",
       parameters: {
         type: "object",
-        properties: {
-          message: { type: "string" },
-          cwd: { type: "string" },
-        },
+        properties: { message: { type: "string" } },
         required: ["message"],
       },
     },

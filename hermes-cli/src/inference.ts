@@ -8,6 +8,8 @@ const API_KEY = process.env.INFERENCE_API_KEY ?? "none";
 
 const client = new OpenAI({ baseURL: BASE_URL, apiKey: API_KEY });
 
+export const config = { STUB, BASE_URL, MODEL };
+
 export type StreamEvent =
   | { type: "token"; content: string }
   | { type: "tool_call"; id: string; name: string; args: string }
@@ -16,7 +18,7 @@ export type StreamEvent =
 export async function* streamChat(
   messages: ChatCompletionMessageParam[],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tools: any[]
+  tools: readonly any[]
 ): AsyncGenerator<StreamEvent> {
   if (STUB) {
     yield* stubStream(messages);
@@ -26,7 +28,7 @@ export async function* streamChat(
   const stream = await client.chat.completions.create({
     model: MODEL,
     messages,
-    tools,
+    tools: [...tools],
     stream: true,
     temperature: 0.7,
     max_tokens: 2048,
@@ -67,11 +69,14 @@ async function* stubStream(messages: ChatCompletionMessageParam[]): AsyncGenerat
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const userText = typeof lastUser?.content === "string" ? lastUser.content : "your request";
 
-  const reply = `[STUB] I received: "${userText}". In a real deployment, I would use my tools to help you. Set STUB_INFERENCE=false and provide INFERENCE_BASE_URL to connect a real Hermes model.`;
+  const reply =
+    `[stub] I received: "${userText}".\n` +
+    `I'm running in STUB mode, so I'm not calling a real model. ` +
+    `Point INFERENCE_BASE_URL at a Hermes endpoint and set STUB_INFERENCE=false to go live.`;
 
   for (const char of reply) {
     yield { type: "token", content: char };
-    await new Promise((r) => setTimeout(r, 12));
+    await new Promise((r) => setTimeout(r, 8));
   }
 
   yield { type: "finish", reason: "stop" };
