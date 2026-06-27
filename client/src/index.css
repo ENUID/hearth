@@ -1,0 +1,41 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f1117;
+  --surface: #181c27;
+  --border: #252a38;
+  --text: #e2e8f0;
+  --text-muted: #64748b;
+  --accent: #7c6af7;
+  --accent-dim: #3d3578;
+  --green: #4ade80;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", "Menlo", monospace;
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --radius: 6px;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* xterm overrides */
+.xterm-viewport { overflow-y: auto !important; }

@@ -27,17 +27,54 @@ Hearth removes the hardware requirement. The computer lives in the cloud; the de
 
 ## Status
 
-🚧 Early development. Building the **Phase 1 vertical slice**: PWA terminal → WebSocket → persistent container → Hermes agent (read/write files, run commands) on shared inference.
+🚧 Early development. **Phase 1 vertical slice is scaffolded and runnable.**
 
 ### Roadmap
 
-- **Phase 1** — Code from any device with an AI agent (no dedicated GPU).
+- **Phase 1** — Code from any device with an AI agent (no dedicated GPU). ← *building now*
 - **Phase 2** — Spin up a GPU from your pocket (on-demand, scale-to-zero).
 - **Phase 3** — Fine-tuning, teams, and self-host.
 
-## Tech (planned)
+## Quick Start (dev)
 
-React 19 + Vite (PWA) · xterm.js · WebSocket PTY · Go control plane · Kubernetes · Firecracker/gVisor isolation · vLLM · Hermes.
+```bash
+# 1. Install dependencies
+npm run install:all
+
+# 2. Copy env and configure
+cp .env.example server/.env
+# STUB_INFERENCE=true is the default — no GPU needed to start
+
+# 3. Run server + client in parallel
+npm run dev
+```
+
+Open `http://localhost:5173` — you'll see a split terminal + chat pane.
+The terminal is a real PTY (your local shell). The chat calls the Hermes agent loop (stubbed by default; set `STUB_INFERENCE=false` + `INFERENCE_BASE_URL` to wire a real vLLM endpoint).
+
+### Docker (optional)
+
+```bash
+cd docker && docker compose up --build
+# server on :3001; point a browser at localhost:5173 (run client separately)
+```
+
+## Architecture
+
+```
+Browser (PWA)
+  xterm.js ──── WS /pty ────  node-pty  ──── /bin/bash
+  Chat pane ─── WS /agent ─── agent loop ─── tools (fs, shell, git)
+                                    │
+                             inference client
+                             (vLLM / STUB)
+```
+
+Full technical spec: [`docs/hearth-spec.md`](docs/hearth-spec.md)
+
+## Tech
+
+React 19 · Vite 6 PWA · xterm.js v5 · TypeScript · Node.js 20 · node-pty · WebSocket · vLLM · NousResearch/Hermes-3
 
 ---
 

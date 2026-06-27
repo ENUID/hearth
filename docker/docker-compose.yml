@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: "3001"
+      STUB_INFERENCE: "true"
+      # Set these to connect a real Hermes endpoint:
+      # STUB_INFERENCE: "false"
+      # INFERENCE_BASE_URL: "http://vllm:8000/v1"
+      # INFERENCE_MODEL: "NousResearch/Hermes-3-Llama-3.1-8B"
+    volumes:
+      - hearth-home:/home/hearth
+    restart: unless-stopped
+
+  # Uncomment to run vLLM with Hermes (requires GPU):
+  # vllm:
+  #   image: vllm/vllm-openai:latest
+  #   command: >
+  #     --model NousResearch/Hermes-3-Llama-3.1-8B
+  #     --dtype auto
+  #     --max-model-len 8192
+  #     --tool-call-parser hermes
+  #   ports:
+  #     - "8000:8000"
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   volumes:
+  #     - hf-cache:/root/.cache/huggingface
+
+volumes:
+  hearth-home:
+  # hf-cache:
