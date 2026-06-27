@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 
 export type PtySocket = {
   send: (data: ArrayBuffer | string) => void;
@@ -87,12 +87,18 @@ export function usePtySocket(sessionId: string): PtySocket {
     };
   }, []);
 
-  return {
-    send,
-    resize,
-    onData,
-    get connected() {
-      return connected.current;
-    },
-  };
+  // Return a stable object: its identity must not change across renders, or
+  // consumers that depend on it (Terminal's effect) would tear down and rebuild
+  // the terminal on every parent re-render. send/resize/onData are stable.
+  return useMemo(
+    () => ({
+      send,
+      resize,
+      onData,
+      get connected() {
+        return connected.current;
+      },
+    }),
+    [send, resize, onData]
+  );
 }

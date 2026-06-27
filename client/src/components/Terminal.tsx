@@ -1,15 +1,34 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import type { PtySocket } from "../hooks/usePtySocket";
 
+type Mods = { ctrl: boolean; alt: boolean };
+
 type Props = {
   ptySocket: PtySocket;
+  /** Sticky modifiers from the mobile key bar, applied to the next typed char. */
+  modifiersRef?: MutableRefObject<Mods>;
+  /** Called after a sticky modifier is consumed, so the UI can clear it. */
+  onConsumeModifiers?: () => void;
 };
 
-export default function Terminal({ ptySocket }: Props) {
+// Apply a sticky Ctrl/Alt to a single typed character.
+function applyMods(data: string, mods: Mods): string {
+  let ch = data;
+  if (mods.ctrl) {
+    const code = data.toLowerCase().charCodeAt(0);
+    if (code >= 97 && code <= 122) ch = String.fromCharCode(code - 96); // ^a..^z
+    else if (data === " ") ch = "\x00";
+    else if (code >= 91 && code <= 95) ch = String.fromCharCode(code - 64); // ^[ ^\ ^] ^^ ^_
+  }
+  if (mods.alt) ch = "\x1b" + ch; // Alt = ESC prefix
+  return ch;
+}
+
+export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -79,6 +98,12 @@ export default function Terminal({ ptySocket }: Props) {
     });
 
     term.onData((data) => {
+      const mods = modifiersRef?.current;
+      if (mods && (mods.ctrl || mods.alt) && data.length === 1) {
+        ptySocket.send(applyMods(data, mods));
+        onConsumeModifiers?.();
+        return;
+      }
       ptySocket.send(data);
     });
 
