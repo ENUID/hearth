@@ -10,14 +10,24 @@ export type PtySocket = {
 export function usePtySocket(sessionId: string): PtySocket {
   const ws = useRef<WebSocket | null>(null);
   const listeners = useRef<Set<(data: ArrayBuffer) => void>>(new Set());
+  // Hold output that arrives before a terminal has attached, then replay it.
+  const pending = useRef<ArrayBuffer[]>([]);
   const connected = useRef(false);
 
   useEffect(() => {
+    // Each effect run owns its socket lifecycle. `disposed` is local so that a
+    // socket closed during teardown (e.g. StrictMode remount) does NOT trigger
+    // a reconnect — which previously spawned zombie duplicate connections.
+    let disposed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let socket: WebSocket | null = null;
+
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const url = `${proto}://${location.host}/pty?sid=${sessionId}`;
 
     function connect() {
-      const socket = new WebSocket(url);
+      if (disposed) return;
+      socket = new WebSocket(url);
       socket.binaryType = "arraybuffer";
       ws.current = socket;
 
@@ -26,26 +36,29 @@ export function usePtySocket(sessionId: string): PtySocket {
       };
 
       socket.onmessage = (ev) => {
-        if (ev.data instanceof ArrayBuffer) {
+        if (!(ev.data instanceof ArrayBuffer)) return;
+        if (listeners.current.size === 0) {
+          pending.current.push(ev.data);
+        } else {
           listeners.current.forEach((cb) => cb(ev.data as ArrayBuffer));
         }
       };
 
       socket.onclose = () => {
         connected.current = false;
-        ws.current = null;
-        setTimeout(connect, 2000);
+        if (ws.current === socket) ws.current = null;
+        if (!disposed) reconnectTimer = setTimeout(connect, 1500);
       };
 
-      socket.onerror = () => {
-        socket.close();
-      };
+      socket.onerror = () => socket?.close();
     }
 
     connect();
 
     return () => {
-      ws.current?.close();
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      socket?.close();
     };
   }, [sessionId]);
 
@@ -63,8 +76,23 @@ export function usePtySocket(sessionId: string): PtySocket {
 
   const onData = useCallback((cb: (data: ArrayBuffer) => void) => {
     listeners.current.add(cb);
-    return () => listeners.current.delete(cb);
+    // Replay anything buffered before this terminal attached.
+    if (pending.current.length) {
+      const queued = pending.current;
+      pending.current = [];
+      queued.forEach((d) => cb(d));
+    }
+    return () => {
+      listeners.current.delete(cb);
+    };
   }, []);
 
-  return { send, resize, onData, get connected() { return connected.current; } };
+  return {
+    send,
+    resize,
+    onData,
+    get connected() {
+      return connected.current;
+    },
+  };
 }

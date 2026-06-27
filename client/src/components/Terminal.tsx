@@ -53,10 +53,26 @@ export default function Terminal({ ptySocket }: Props) {
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
     term.open(containerRef.current);
-    fitAddon.fit();
 
     termRef.current = term;
     fitAddonRef.current = fitAddon;
+
+    // Fit only when the element has a real size AND xterm's renderer has computed
+    // its cell dimensions — otherwise FitAddon throws "reading 'dimensions'".
+    // Returns true once a fit actually happened.
+    const safeFit = (): boolean => {
+      const el = containerRef.current;
+      if (!el || el.clientWidth === 0 || el.clientHeight === 0) return false;
+      try {
+        const dims = fitAddon.proposeDimensions();
+        if (!dims || !Number.isFinite(dims.cols) || !Number.isFinite(dims.rows)) return false;
+        fitAddon.fit();
+        ptySocket.resize(term.cols, term.rows);
+        return true;
+      } catch {
+        return false; // renderer not ready yet; a later tick will retry
+      }
+    };
 
     const unsubData = ptySocket.onData((data) => {
       term.write(new Uint8Array(data));
@@ -67,18 +83,17 @@ export default function Terminal({ ptySocket }: Props) {
     });
 
     const ro = new ResizeObserver(() => {
-      fitAddon.fit();
-      const { cols, rows } = term;
-      ptySocket.resize(cols, rows);
+      safeFit();
     });
     ro.observe(containerRef.current);
 
+    // Retry the initial fit until the renderer is ready and the socket is up.
+    requestAnimationFrame(() => safeFit());
+    let fitted = false;
     const timer = setInterval(() => {
-      if (ptySocket.connected) {
-        ptySocket.resize(term.cols, term.rows);
-        clearInterval(timer);
-      }
-    }, 200);
+      if (!fitted) fitted = safeFit();
+      if (fitted && ptySocket.connected) clearInterval(timer);
+    }, 150);
 
     return () => {
       clearInterval(timer);
