@@ -57,6 +57,7 @@ A complete terminal, not a demo:
 | `docker/` | The container image (a capable Linux workspace) and Compose setup. |
 | `docs/hearth-spec.md` | Full technical spec. |
 | `docs/installing-tools.md` | How to install AI agents/CLIs and persist keys. |
+| `docs/running-ai-clis.md` | Step-by-step: Claude Code, bigger models, GPU, APIs. |
 
 ## Run it
 
