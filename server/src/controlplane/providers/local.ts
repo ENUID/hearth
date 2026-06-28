@@ -1,5 +1,5 @@
 import type { MachineProvider } from "../provider";
-import type { GpuSpec, Tier } from "../types";
+import type { Tier } from "../types";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -26,13 +26,6 @@ export class LocalProvider implements MachineProvider {
     await delay(LAT);
   }
   async destroy(_id: string): Promise<void> {
-    await delay(Math.min(LAT, 50));
-  }
-  async attachGpu(_id: string, _spec: GpuSpec): Promise<string> {
-    await delay(LAT * 3); // GPUs take longer to come up
-    return `local-gpu-${Math.random().toString(36).slice(2, 8)}`;
-  }
-  async detachGpu(_id: string): Promise<void> {
     await delay(Math.min(LAT, 50));
   }
 }

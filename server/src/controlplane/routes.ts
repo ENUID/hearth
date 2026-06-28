@@ -14,6 +14,7 @@ function snapshot() {
     tiers: TIERS,
     gpuCatalog: GPU_CATALOG,
     provider: provider.name,
+    gpuBackend: manager.gpuBackendName(),
     billing: { name: billing.name, live: billing.live },
   };
 }

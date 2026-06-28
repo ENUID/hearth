@@ -223,8 +223,10 @@ Users pay their *own* AI/API providers directly — that cost never touches Hear
 - [x] Providers: Local (built + tested), Docker, Kubernetes (real adapters)
 - [x] Billing: Stripe test-mode adapter (+ simulated fallback)
 - [x] Kubernetes manifests (control plane, RBAC, GPU node template)
-- [ ] **Persistent system rootfs** (committable/overlay) so `apt` installs survive
-- [ ] Real GPU hardware behind the GPU provider (currently a mock + adapters)
+- [x] **Persistent system rootfs**: Docker provider commits the rootfs on
+      scale-to-zero and recreates from it, so `apt`-installed software survives
+- [x] Real GPU backend: GPU is a separate rent-don't-own resource (`gpu.ts`) —
+      a mock by default, real **RunPod** on-demand pods when `RUNPOD_API_KEY` is set
 
 #### 11.1 Control plane design
 

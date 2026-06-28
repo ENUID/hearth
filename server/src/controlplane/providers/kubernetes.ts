@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import type { MachineProvider } from "../provider";
-import { GPU_CATALOG, TIERS, type GpuSpec, type Tier } from "../types";
+import { TIERS, type Tier } from "../types";
 
 const execAsync = promisify(exec);
 
@@ -77,26 +77,5 @@ export class KubernetesProvider implements MachineProvider {
   }
   async destroy(id: string): Promise<void> {
     await this.k(`delete deployment ${this.dep(id)} --ignore-not-found`);
-  }
-  async attachGpu(id: string, spec: GpuSpec): Promise<string> {
-    const known = GPU_CATALOG[spec.type] ? spec.type : "a10g";
-    const patch = JSON.stringify({
-      spec: {
-        template: {
-          spec: {
-            nodeSelector: { "hearth.io/gpu": known },
-            containers: [{ name: "workspace", resources: { limits: { "nvidia.com/gpu": "1" } } }],
-          },
-        },
-      },
-    });
-    await this.k(`patch deployment ${this.dep(id)} --type merge -p '${patch}'`);
-    return `k8s-gpu-${known}`;
-  }
-  async detachGpu(id: string): Promise<void> {
-    const patch = JSON.stringify({
-      spec: { template: { spec: { nodeSelector: null, containers: [{ name: "workspace", resources: { limits: { "nvidia.com/gpu": null } } }] } } },
-    });
-    await this.k(`patch deployment ${this.dep(id)} --type merge -p '${patch}'`);
   }
 }

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { MachineProvider } from "./provider";
+import { makeGpuBackend, type GpuBackend } from "./gpu";
 import {
   GPU_CATALOG,
   TIERS,
@@ -24,9 +25,14 @@ export class MachineManager {
   private usage = new Map<string, Accum>();
   private lastCheckpoint = new Map<string, number>();
   private timer?: NodeJS.Timeout;
+  private gpu: GpuBackend = makeGpuBackend();
 
   constructor(private provider: MachineProvider) {
     this.load();
+  }
+
+  gpuBackendName(): string {
+    return this.gpu.name;
   }
 
   start() {
@@ -133,7 +139,7 @@ export class MachineManager {
     this.flush(id);
     m.gpu = { id: "", spec, state: "provisioning", startedAt: 0 };
     this.save();
-    const gpuId = await this.provider.attachGpu(id, spec);
+    const gpuId = await this.gpu.provision(id, spec);
     m.gpu = { id: gpuId, spec, state: "attached", startedAt: Date.now() };
     m.lastActiveAt = Date.now();
     this.lastCheckpoint.set(id, Date.now());
@@ -147,7 +153,7 @@ export class MachineManager {
     this.flush(id);
     m.gpu.state = "releasing";
     this.save();
-    await this.provider.detachGpu(id);
+    await this.gpu.release(id, m.gpu.id);
     m.gpu.state = "released";
     m.gpu.stoppedAt = Date.now();
     this.save();

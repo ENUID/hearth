@@ -1,7 +1,8 @@
-import type { GpuSpec, Tier } from "./types";
+import type { Tier } from "./types";
 
 // A backend that can actually realize machines. The control plane talks only to
 // this interface, so Local (dev/sandbox), Docker, and Kubernetes are swappable.
+// (GPUs are a separate, rent-don't-own resource — see ./gpu.ts.)
 export interface MachineProvider {
   readonly name: string;
 
@@ -15,9 +16,4 @@ export interface MachineProvider {
   resize(id: string, tier: Tier): Promise<void>;
   /** Permanently delete the machine's compute. */
   destroy(id: string): Promise<void>;
-
-  /** Attach a GPU; resolves when the GPU is ready. Returns a provider GPU id. */
-  attachGpu(id: string, spec: GpuSpec): Promise<string>;
-  /** Release the attached GPU. */
-  detachGpu(id: string): Promise<void>;
 }
