@@ -1,5 +1,7 @@
+import fs from "fs";
 import * as pty from "node-pty";
 import { WebSocket } from "ws";
+import { loadBuffer, saveBuffer, deleteBuffer } from "./persistence";
 
 type Session = {
   ptyProcess: pty.IPty;
@@ -42,16 +44,19 @@ function getOrCreateSession(sid: string): Session {
   const session: Session = {
     ptyProcess,
     lastActive: Date.now(),
-    buffer: "",
+    // Replay prior scrollback (persisted across reconnects and server restarts).
+    buffer: loadBuffer(sid).slice(-MAX_BUFFER),
     sockets: new Set(),
   };
 
-  // One reader per session: keep a replay buffer and broadcast to all clients.
+  // One reader per session: keep a replay buffer, broadcast to all clients, and
+  // persist scrollback to disk so it survives a restart.
   ptyProcess.onData((data) => {
     session.buffer += data;
     if (session.buffer.length > MAX_BUFFER) {
       session.buffer = session.buffer.slice(session.buffer.length - MAX_BUFFER);
     }
+    saveBuffer(sid, session.buffer);
     const bytes = Buffer.from(data, "utf8");
     for (const ws of session.sockets) {
       if (ws.readyState === WebSocket.OPEN) ws.send(bytes, { binary: true });
@@ -125,4 +130,38 @@ export function handlePtyConnection(ws: WebSocket, sid: string) {
   });
 
   ws.on("error", () => ws.close());
+}
+
+/** The live working directory of a session's shell (follows `cd`). */
+export function getSessionCwd(sid: string): string {
+  const home = process.env.HOME ?? "/";
+  const s = sessions.get(sid);
+  if (!s) return home;
+  try {
+    return fs.readlinkSync(`/proc/${s.ptyProcess.pid}/cwd`);
+  } catch {
+    return home;
+  }
+}
+
+/** Permanently end a session (used when a user closes a tab). */
+export function killSession(sid: string): void {
+  const s = sessions.get(sid);
+  if (s) {
+    if (s.reapTimer) clearTimeout(s.reapTimer);
+    for (const ws of s.sockets) {
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      s.ptyProcess.kill();
+    } catch {
+      /* ignore */
+    }
+    sessions.delete(sid);
+  }
+  deleteBuffer(sid);
 }

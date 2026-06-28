@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useMemo } from "react";
+import { tokenParam } from "../lib/api";
 
 export type PtySocket = {
   send: (data: ArrayBuffer | string) => void;
@@ -23,7 +24,7 @@ export function usePtySocket(sessionId: string): PtySocket {
     let socket: WebSocket | null = null;
 
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const url = `${proto}://${location.host}/pty?sid=${sessionId}`;
+    const url = `${proto}://${location.host}/pty?sid=${sessionId}${tokenParam()}`;
 
     function connect() {
       if (disposed) return;

@@ -35,12 +35,25 @@ Hearth gives you the computer and the terminal. What runs on it is entirely your
 - **Device-agnostic, web-first.** Runs in any modern browser as an installable PWA.
 - **Yours.** Persistent filesystem, your tools, your keys, your bill. We don't sit between you and what you run.
 
+## Features
+
+A complete terminal, not a demo:
+
+- **Full terminal emulation** — 24-bit truecolor, Unicode/emoji/CJK, full-screen TUIs (vim, htop, less), mouse, job control (Ctrl-C/Z/D), 10k scrollback, clickable links, bell.
+- **Copy / paste / search** — Ctrl+Shift+C/V, OSC-52 programmatic clipboard, in-terminal search (Ctrl+Shift+F).
+- **GPU rendering** — WebGL renderer with automatic fallback.
+- **Multiple tabs** — independent concurrent sessions, persisted across reloads.
+- **File upload / download** — buttons + drag-and-drop, relative to the shell's live working directory.
+- **Reconnect & persistence** — scrollback replays on reconnect and survives a server restart; the home directory persists.
+- **Auth** — optional password login (JWT), off by default for local dev.
+- **Mobile** — on-screen key bar (Esc/Tab/Ctrl/Alt/arrows), installable PWA.
+
 ## What's in this repo
 
 | Path | What it is |
 |------|-----------|
-| `client/` | React 19 + Vite PWA. A full-screen xterm.js terminal over a WebSocket. |
-| `server/` | Node.js terminal bridge: WebSocket ⇄ PTY (`node-pty`) in the container. |
+| `client/` | React 19 + Vite PWA: xterm.js terminal, tabs, file transfer, login. |
+| `server/` | Node.js bridge: WebSocket ⇄ PTY, persistence, auth, file endpoints. |
 | `docker/` | The container image (a capable Linux workspace) and Compose setup. |
 | `docs/hearth-spec.md` | Full technical spec. |
 | `docs/installing-tools.md` | How to install AI agents/CLIs and persist keys. |
@@ -63,9 +76,11 @@ For the full containerized experience (terminal + persistent Linux workspace):
 docker compose -f docker/docker-compose.yml up --build
 ```
 
+To require a password, set `HEARTH_REQUIRE_AUTH=true`, `HEARTH_PASSWORD`, and `HEARTH_JWT_SECRET` (see `.env.example`).
+
 ## Status
 
-🚧 Early development — **Phase 1 vertical slice**: browser terminal → WebSocket → persistent Linux container. Real shell, real filesystem, install anything.
+🚧 Early development — **Phase 1** is functional end-to-end: browser terminal → WebSocket → persistent Linux container, with tabs, file transfer, auth, and reconnect/persistence. Real shell, real filesystem, install anything.
 
 ### Roadmap
 

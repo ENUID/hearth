@@ -10,8 +10,14 @@ services:
       - "3001:3001"
     environment:
       PORT: "3001"
+      # Auth is off by default. Uncomment all three to require a password:
+      # HEARTH_REQUIRE_AUTH: "true"
+      # HEARTH_PASSWORD: "change-me"
+      # HEARTH_JWT_SECRET: "a-long-random-secret"
     volumes:
-      - hearth-home:/home/hearth   # persistent home directory across sessions
+      # Persistent home — also holds session scrollback (~/.hearth/sessions),
+      # so terminals replay after reconnect and across restarts.
+      - hearth-home:/home/hearth
     restart: unless-stopped
 
 volumes:

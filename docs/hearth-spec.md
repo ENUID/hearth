@@ -57,9 +57,12 @@ The bridge is deliberately thin: it moves bytes between the browser and a PTY an
 
 ## 4. Client (PWA)
 
-A single full-screen terminal. No chat, no editor chrome — the shell is the UI.
+A terminal-first UI: a slim header (tabs + file transfer) over a full-screen terminal.
 
-- **Terminal:** `@xterm/xterm` with `FitAddon` (resize to viewport) and `WebLinksAddon` (clickable URLs). 256-color theme, generous scrollback.
+- **Terminal:** `@xterm/xterm` with addons — `FitAddon`, `WebLinksAddon`, `Unicode11Addon` (wide chars), `SearchAddon`, `ClipboardAddon` (OSC-52), and `WebglAddon` (GPU rendering, with feature-detect + guarded fallback). Truecolor theme, 10k scrollback, copy/paste, in-terminal search.
+- **Tabs:** each tab is an independent session (`sid`); all stay mounted so their sessions keep running, persisted in `localStorage`.
+- **File transfer:** upload (button + drag-drop) and download, targeting the active session's cwd.
+- **Auth:** a login screen appears only when the server reports `authRequired`.
 - **Transport:** binary WebSocket to `/pty`. Raw PTY bytes in both directions; resize sent as a JSON control frame `{"type":"resize","cols":N,"rows":N}` on the same socket.
 - **Reconnect:** auto-reconnect with backoff; the server keeps the PTY alive briefly so a dropped phone connection doesn't kill the session.
 - **PWA:** `manifest.json` (`display: standalone`), service worker for the app shell, installable to the home screen, mobile viewport with `viewport-fit=cover`.
@@ -73,18 +76,33 @@ Phones lack the keys a terminal needs. Planned: an accessory key bar (Esc, Tab, 
 ## 5. Terminal Bridge (Server)
 
 ```
-GET  /health          → liveness
-WS   /pty?sid=<id>    → attach a PTY
+GET  /health                         → liveness
+GET  /api/config                     → { authRequired }
+POST /api/login                      → { token }            (when auth enabled)
+GET  /api/files/download?sid=&path=  → stream a file (cwd-relative)   [auth]
+POST /api/files/upload?sid=&name=    → write raw body to cwd          [auth]
+POST /api/session/kill?sid=          → end a session (close tab)      [auth]
+WS   /pty?sid=<id>                    → attach a PTY                    [auth]
 ```
 
 On WS connect:
 1. Look up or create the session's PTY (`node-pty` spawning `$SHELL` / `/bin/bash`, `TERM=xterm-256color`).
-2. Pipe PTY output → WS as binary frames.
-3. Pipe WS binary frames → PTY stdin.
-4. Intercept `{"type":"resize",...}` JSON frames and resize the PTY.
-5. On WS close: keep the PTY alive for a grace window (reconnect), then reap.
+2. Replay the session's scrollback buffer to the new client (current screen).
+3. Broadcast PTY output → all attached clients as binary frames; persist scrollback.
+4. Pipe client frames → PTY stdin; intercept `{"type":"resize",...}` JSON control frames.
+5. On last client disconnect: keep the PTY alive for a grace window (reconnect), then reap.
 
-That is the entire server responsibility.
+### 5.1 Sessions & persistence
+
+Each `sid` is an independent session (the basis for tabs). A session's scrollback is broadcast to all its clients and persisted to disk (`HEARTH_STATE_DIR`, default `$HOME/.hearth/sessions`). On reconnect — even after a server restart — the buffer is replayed so the user returns to their screen. The live PTY process can't survive a restart, but the screen contents and the home directory do.
+
+### 5.2 File transfer
+
+Upload/download resolve paths against the session shell's **live working directory** (read from `/proc/<pid>/cwd`, so it follows `cd`). Uploads stream the raw request body into `cwd/<name>`; downloads stream the file as an attachment.
+
+### 5.3 Auth
+
+Auth is disabled by default. When `HEARTH_REQUIRE_AUTH=true` and `HEARTH_PASSWORD` is set, `POST /api/login` exchanges the password for a short HMAC-signed token (JWT-style, no dependency). The token gates the REST API and the WebSocket (via `Authorization: Bearer` or a `?token=` query param for links/sockets).
 
 ---
 
@@ -139,7 +157,7 @@ A user can scale their machine up — more CPU/RAM, or a GPU — when they need 
 
 - **Session isolation:** one Linux container per user (cgroups, namespaces); Phase 1 Docker with resource limits, Phase 2+ Firecracker/gVisor microVMs. No inter-container network.
 - **The container is the trust boundary.** The user has root (`sudo`) *inside* their own container by design — it's their machine. Isolation is enforced at the container boundary (cgroups/namespaces, microVM in Phase 2+), not by restricting what they can do within it. Resource caps and egress limits guard against abuse.
-- **Auth:** Phase 1 JWT passed on WS connect; Phase 2 passkeys / OAuth.
+- **Auth:** optional in Phase 1 — a password is exchanged for an HMAC-signed token that gates the API and WS. Phase 2: passkeys / OAuth, multi-user accounts.
 - **Transport:** WSS everywhere. PTY traffic is relayed browser ⇄ container. Any keys a user stores live in *their* container, never in Hearth's control plane.
 
 ---
@@ -187,9 +205,12 @@ Users pay their *own* AI/API providers directly — that cost never touches Hear
 - [x] Node terminal bridge: PTY ⇄ WebSocket, resize, reconnect grace
 - [x] Docker image: capable Linux workspace + bridge
 - [x] Install-friendly machine: `sudo`, persistent user-level install paths, seeded dotfiles, tool/key recipes
-- [ ] Session persistence and auth
-- [ ] Mobile key bar + paste/clipboard
-- [ ] Multiple tabs / concurrent sessions
+- [x] Full terminal capabilities: truecolor, unicode, TUIs, copy/paste, search, GPU rendering
+- [x] Mobile key bar + paste/clipboard
+- [x] Multiple tabs / concurrent sessions
+- [x] File upload / download (relative to the shell's live cwd)
+- [x] Session persistence (scrollback replay across reconnect and restart)
+- [x] Optional password auth (JWT)
 
 **Done when:** a developer opens a URL on their phone, gets a real Linux shell, installs whatever they want, and works — with zero local setup.
 

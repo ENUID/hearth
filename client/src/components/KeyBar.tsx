@@ -1,9 +1,7 @@
-import type { PtySocket } from "../hooks/usePtySocket";
-
 type Mods = { ctrl: boolean; alt: boolean };
 
 type Props = {
-  pty: PtySocket;
+  onSend: (data: string) => void;
   mods: Mods;
   onToggleCtrl: () => void;
   onToggleAlt: () => void;
@@ -32,7 +30,7 @@ const KEYS: Key[] = [
   { label: "→", send: "\x1b[C" },
 ];
 
-export default function KeyBar({ pty, mods, onToggleCtrl, onToggleAlt }: Props) {
+export default function KeyBar({ onSend, mods, onToggleCtrl, onToggleAlt }: Props) {
   function press(e: React.PointerEvent, key: Key) {
     // preventDefault keeps focus on the terminal so the soft keyboard stays up
     // and sticky modifiers can apply to the next typed character.
@@ -42,7 +40,7 @@ export default function KeyBar({ pty, mods, onToggleCtrl, onToggleAlt }: Props) 
       else onToggleAlt();
       return;
     }
-    pty.send(key.send);
+    onSend(key.send);
   }
 
   return (
