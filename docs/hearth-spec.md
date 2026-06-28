@@ -216,7 +216,31 @@ Users pay their *own* AI/API providers directly — that cost never touches Hear
 
 ### Phase 2 — More machine on demand
 
-Scale CPU/RAM/GPU up and down from any device; metering/billing; Kubernetes-native scheduling; scale-to-zero. **Persistent system rootfs** (committable / overlay) so `apt`-installed software survives, not just the home directory.
+- [x] Control plane: machine lifecycle (provision → run → sleep → wake) behind a provider interface
+- [x] Resize CPU/RAM tiers; provision/release a GPU on demand
+- [x] Scale-to-zero on idle, wake on activity (tied to terminal use)
+- [x] Usage metering (compute + GPU minutes/cost) and an itemized invoice
+- [x] Providers: Local (built + tested), Docker, Kubernetes (real adapters)
+- [x] Billing: Stripe test-mode adapter (+ simulated fallback)
+- [x] Kubernetes manifests (control plane, RBAC, GPU node template)
+- [ ] **Persistent system rootfs** (committable/overlay) so `apt` installs survive
+- [ ] Real GPU hardware behind the GPU provider (currently a mock + adapters)
+
+#### 11.1 Control plane design
+
+The control plane manages **machines** (one workspace machine backs a user's
+terminal tabs) through a `MachineProvider` interface, so the backend is
+swappable: `LocalProvider` (in-process, the verified default), `DockerProvider`
+(containers with CPU/mem limits, `docker update` resize, stop=scale-to-zero,
+`commit` for rootfs), `KubernetesProvider` (a Deployment per machine, PVC home,
+`replicas 0↔1` = sleep/wake, `nvidia.com/gpu` for GPUs).
+
+State machine: `provisioning → running → asleep ⇄ waking`. Idle machines sleep
+(releasing any GPU to stop billing); the next terminal connection wakes them.
+Metering accrues compute-minutes (by tier rate) and GPU-minutes (by GPU rate)
+into an invoice; `Billing` is a Stripe (test-mode) adapter or a simulated
+fallback. API: `GET /api/machine`, `POST /api/machine/{resize,wake,sleep,gpu}`,
+`DELETE /api/machine/gpu`, `GET /api/usage`, `POST /api/billing/charge`.
 
 ### Phase 3 — Teams, workspaces, self-host
 

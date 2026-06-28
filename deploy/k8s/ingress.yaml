@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hearth
+  namespace: hearth
+  annotations:
+    # WebSocket (PTY) support — adjust for your ingress controller.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  rules:
+    - host: hearth.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hearth
+                port: { number: 80 }
+  # tls:
+  #   - hosts: [hearth.example.com]
+  #     secretName: hearth-tls

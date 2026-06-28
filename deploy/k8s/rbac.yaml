@@ -1,0 +1,33 @@
+# Lets the control plane create/scale/patch per-workspace Deployments + PVCs.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hearth-control-plane
+  namespace: hearth
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hearth-workspace-manager
+  namespace: hearth
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims", "pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hearth-workspace-manager
+  namespace: hearth
+subjects:
+  - kind: ServiceAccount
+    name: hearth-control-plane
+    namespace: hearth
+roleRef:
+  kind: Role
+  name: hearth-workspace-manager
+  apiGroup: rbac.authorization.k8s.io

@@ -2,6 +2,7 @@ import fs from "fs";
 import * as pty from "node-pty";
 import { WebSocket } from "ws";
 import { loadBuffer, saveBuffer, deleteBuffer } from "./persistence";
+import { manager, WORKSPACE_ID } from "./controlplane/index";
 
 type Session = {
   ptyProcess: pty.IPty;
@@ -57,6 +58,7 @@ function getOrCreateSession(sid: string): Session {
       session.buffer = session.buffer.slice(session.buffer.length - MAX_BUFFER);
     }
     saveBuffer(sid, session.buffer);
+    manager.markActive(WORKSPACE_ID);
     const bytes = Buffer.from(data, "utf8");
     for (const ws of session.sockets) {
       if (ws.readyState === WebSocket.OPEN) ws.send(bytes, { binary: true });
@@ -68,6 +70,8 @@ function getOrCreateSession(sid: string): Session {
 }
 
 export function handlePtyConnection(ws: WebSocket, sid: string) {
+  // Opening a terminal counts as activity: wake the workspace machine if asleep.
+  void manager.touch(WORKSPACE_ID);
   const session = getOrCreateSession(sid);
   const { ptyProcess } = session;
 
@@ -91,6 +95,7 @@ export function handlePtyConnection(ws: WebSocket, sid: string) {
       ? raw
       : Buffer.from(raw);
     session.lastActive = Date.now();
+    manager.markActive(WORKSPACE_ID);
 
     // Text frames may be control frames (JSON) or keystrokes. Binary frames are
     // always raw terminal input. Note: `ws` delivers every frame as a Buffer, so

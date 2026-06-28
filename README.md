@@ -47,6 +47,7 @@ A complete terminal, not a demo:
 - **Reconnect & persistence** — scrollback replays on reconnect and survives a server restart; the home directory persists.
 - **Auth** — optional password login (JWT), off by default for local dev.
 - **Mobile** — on-screen key bar (Esc/Tab/Ctrl/Alt/arrows), installable PWA.
+- **Machine control (Phase 2)** — resize CPU/RAM tiers, provision/release a GPU on demand, scale-to-zero when idle (wake on use), live usage metering and cost, optional Stripe billing. Pluggable backends: local (dev), Docker, Kubernetes.
 
 ## What's in this repo
 
@@ -55,6 +56,7 @@ A complete terminal, not a demo:
 | `client/` | React 19 + Vite PWA: xterm.js terminal, tabs, file transfer, login. |
 | `server/` | Node.js bridge: WebSocket ⇄ PTY, persistence, auth, file endpoints. |
 | `docker/` | The container image (a capable Linux workspace) and Compose setup. |
+| `deploy/k8s/` | Kubernetes manifests for production (control plane + GPU nodes). |
 | `docs/hearth-spec.md` | Full technical spec. |
 | `docs/installing-tools.md` | How to install AI agents/CLIs and persist keys. |
 | `docs/running-ai-clis.md` | Step-by-step: Claude Code, bigger models, GPU, APIs. |
@@ -85,8 +87,8 @@ To require a password, set `HEARTH_REQUIRE_AUTH=true`, `HEARTH_PASSWORD`, and `H
 
 ### Roadmap
 
-- **Phase 1** — A real, fully-capable cloud terminal from any device.
-- **Phase 2** — A more powerful machine on demand: scale up CPU/RAM/GPU from your pocket when you need it, scale to zero when you don't.
+- **Phase 1** ✅ — A real, fully-capable cloud terminal from any device.
+- **Phase 2** ✅ (control plane) — Resize CPU/RAM/GPU on demand, scale-to-zero, metering + billing. Local backend is built and tested; Docker/Kubernetes/Stripe are real adapters that activate with the matching environment/credentials.
 - **Phase 3** — Teams, multiple workspaces, and self-host.
 
 ## Tech

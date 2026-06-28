@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import TerminalTab from "./components/TerminalTab";
 import KeyBar from "./components/KeyBar";
 import Login from "./components/Login";
+import MachinePanel from "./components/MachinePanel";
 import type { PtySocket } from "./hooks/usePtySocket";
-import { getConfig, getToken, uploadFile, downloadUrl } from "./lib/api";
+import { getConfig, getToken, uploadFile, downloadUrl, getMachine } from "./lib/api";
 
 type Mods = { ctrl: boolean; alt: boolean };
 type Tab = { id: string; title: string };
@@ -88,6 +89,23 @@ export default function App() {
   const toggleCtrl = useCallback(() => apply({ ctrl: !modifiersRef.current.ctrl, alt: modifiersRef.current.alt }), [apply]);
   const toggleAlt = useCallback(() => apply({ ctrl: modifiersRef.current.ctrl, alt: !modifiersRef.current.alt }), [apply]);
   const clearMods = useCallback(() => apply({ ctrl: false, alt: false }), [apply]);
+
+  // --- machine status (Phase 2 control plane) ---
+  const [machineOpen, setMachineOpen] = useState(false);
+  const [machineState, setMachineState] = useState<string>("");
+  useEffect(() => {
+    let stop = false;
+    const poll = () =>
+      getMachine()
+        .then((s) => !stop && setMachineState(s.machine?.state ?? ""))
+        .catch(() => {});
+    poll();
+    const t = setInterval(poll, 8000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, []);
 
   const [showKeyBar, setShowKeyBar] = useState(detectTouch);
   useEffect(() => {
@@ -186,6 +204,12 @@ export default function App() {
           </button>
         </div>
 
+        {/* machine */}
+        <button onClick={() => setMachineOpen(true)} title="machine: size, GPU, usage" style={{ ...iconBtn, display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ color: MACHINE_STATE_COLOR[machineState] ?? "var(--text-muted)", fontSize: 9 }}>●</span>
+          machine
+        </button>
+
         {/* file transfer */}
         {status && <span style={{ color: "var(--text-muted)", fontSize: 11, marginRight: 8 }}>{status}</span>}
         <button onClick={() => fileInputRef.current?.click()} title="upload file" style={iconBtn}>
@@ -229,9 +253,20 @@ export default function App() {
 
       {/* mobile key bar */}
       {showKeyBar && <KeyBar onSend={sendToActive} mods={mods} onToggleCtrl={toggleCtrl} onToggleAlt={toggleAlt} />}
+
+      {/* machine control panel */}
+      {machineOpen && <MachinePanel onClose={() => setMachineOpen(false)} />}
     </div>
   );
 }
+
+const MACHINE_STATE_COLOR: Record<string, string> = {
+  running: "var(--green)",
+  asleep: "var(--text-muted)",
+  waking: "var(--yellow)",
+  provisioning: "var(--yellow)",
+  error: "var(--red)",
+};
 
 const headerStyle: React.CSSProperties = {
   height: 40,

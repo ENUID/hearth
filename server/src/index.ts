@@ -5,6 +5,7 @@ import { URL } from "url";
 import { handlePtyConnection, killSession } from "./ptyHandler";
 import { handleDownload, handleUpload } from "./files";
 import { authEnabled, checkPassword, issueToken, isAuthorized } from "./auth";
+import { mountControlPlane } from "./controlplane/routes";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 
@@ -55,6 +56,9 @@ app.post("/api/session/kill", (req, res) => {
   killSession(String(req.query.sid ?? ""));
   res.json({ ok: true });
 });
+
+// Phase 2 control plane: machine sizing, scale-to-zero, GPU, metering, billing.
+mountControlPlane(app, (req) => isAuthorized(req, reqUrl(req)));
 
 const httpServer = createServer(app);
 const wss = new WebSocketServer({ noServer: true });

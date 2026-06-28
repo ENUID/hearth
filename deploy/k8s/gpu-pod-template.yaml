@@ -1,0 +1,34 @@
+# Reference shape of a GPU-attached workspace. The KubernetesProvider produces
+# the equivalent by patching a workspace Deployment when a GPU is provisioned
+# (nodeSelector hearth.io/gpu + nvidia.com/gpu limit). Not applied directly.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ws-example-gpu
+  namespace: hearth
+  labels: { app: hearth-workspace }
+spec:
+  replicas: 1
+  selector: { matchLabels: { machine: ws-example-gpu } }
+  template:
+    metadata: { labels: { app: hearth-workspace, machine: ws-example-gpu } }
+    spec:
+      nodeSelector:
+        hearth.io/gpu: a10g
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: workspace
+          image: REPLACE_ME/hearth-workspace:latest
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4096Mi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - { name: home, mountPath: /home/hearth }
+      volumes:
+        - name: home
+          persistentVolumeClaim: { claimName: ws-example-gpu-home }
