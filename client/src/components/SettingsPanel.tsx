@@ -1,4 +1,5 @@
 import { useSettings, setSettings } from "../lib/settings";
+import type { Command } from "./CommandPalette";
 
 function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { label: string; value: T }[]; onChange: (v: T) => void }) {
   return (
@@ -26,8 +27,11 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
   );
 }
 
-export default function SettingsPanel({ onClose }: { onClose: () => void }) {
+export default function SettingsPanel({ onClose, commands = [] }: { onClose: () => void; commands?: Command[] }) {
   const s = useSettings();
+  // Actions live here now (no command-palette button in the header). Hide the
+  // entries that just open/duplicate this panel.
+  const actions = commands.filter((c) => c.id !== "settings" && c.id !== "theme");
   return (
     <div onClick={onClose} style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={drawer}>
@@ -35,6 +39,27 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
           <h2 style={{ fontSize: 15, fontFamily: "var(--font-mono)", color: "var(--fg)" }}>settings</h2>
           <button onClick={onClose} style={closeBtn} tabIndex={-1}>✕</button>
         </div>
+
+        {actions.length > 0 && (
+          <>
+            <div style={section}>actions</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {actions.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    onClose();
+                    c.run();
+                  }}
+                  style={actionRow}
+                >
+                  <span>{c.title}</span>
+                  {c.hint && <span style={{ fontSize: 11, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>{c.hint}</span>}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div style={section}>theme</div>
         <Segmented
@@ -100,3 +125,4 @@ const section: React.CSSProperties = {
 };
 const closeBtn: React.CSSProperties = { marginLeft: "auto", background: "transparent", border: "none", color: "var(--fg-muted)", cursor: "pointer", fontSize: 14 };
 const stepBtn: React.CSSProperties = { width: 32, height: 32, borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "transparent", color: "var(--fg)", cursor: "pointer", fontSize: 16 };
+const actionRow: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--fg)", cursor: "pointer", fontSize: 13, padding: "9px 10px" };
