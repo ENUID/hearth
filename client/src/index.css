@@ -4,20 +4,45 @@
   padding: 0;
 }
 
+/* ── Minimal monochrome design tokens ── */
+:root,
+:root[data-theme="dark"] {
+  --bg: #0b0c0e;
+  --bg-elevated: #141518;
+  --bg-inset: #08090a;
+  --fg: #e8e9ea;
+  --fg-muted: #969a9f;
+  --fg-subtle: #5f646a;
+  --border: #1c1e22;
+  --border-strong: #2b2e33;
+  --accent: #e8e9ea;          /* monochrome: accent == foreground */
+  --accent-soft: rgba(232, 233, 234, 0.10);
+  --selection: rgba(232, 233, 234, 0.16);
+  --danger: #d98c8c;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-elevated: #f6f7f8;
+  --bg-inset: #fbfbfc;
+  --fg: #15171a;
+  --fg-muted: #5c6166;
+  --fg-subtle: #9aa0a6;
+  --border: #e7e9ec;
+  --border-strong: #d3d7db;
+  --accent: #15171a;
+  --accent-soft: rgba(21, 23, 26, 0.06);
+  --selection: rgba(21, 23, 26, 0.12);
+  --danger: #b4453f;
+  color-scheme: light;
+}
+
 :root {
-  --bg: #0f1117;
-  --surface: #181c27;
-  --border: #252a38;
-  --text: #e2e8f0;
-  --text-muted: #64748b;
-  --accent: #7c6af7;
-  --accent-dim: #3d3578;
-  --green: #4ade80;
-  --red: #f87171;
-  --yellow: #fbbf24;
   --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", "Menlo", monospace;
   --font-sans: system-ui, -apple-system, sans-serif;
-  --radius: 6px;
+  --radius: 8px;
+  --radius-sm: 5px;
 }
 
 html, body, #root {
@@ -25,17 +50,25 @@ html, body, #root {
   width: 100%;
   overflow: hidden;
   background: var(--bg);
-  color: var(--text);
+  color: var(--fg);
   font-family: var(--font-sans);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::selection { background: var(--selection); }
 
-/* xterm overrides */
+/* scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fg-subtle); }
+
 .xterm-viewport { overflow-y: auto !important; }
+
+/* reusable bits */
+button { font-family: inherit; }
+.hearth-fade { animation: hearthFade 0.12s ease-out; }
+@keyframes hearthFade { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+@keyframes hearthPop { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }

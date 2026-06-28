@@ -7,9 +7,34 @@ import { SearchAddon } from "@xterm/addon-search";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
+import type { ITheme } from "@xterm/xterm";
 import type { PtySocket } from "../hooks/usePtySocket";
+import { useSettings, getSettings } from "../lib/settings";
 
 type Mods = { ctrl: boolean; alt: boolean };
+
+// The chrome is monochrome, but the terminal keeps real ANSI colors so CLI
+// output stays readable — tuned for each theme.
+function xtermTheme(resolved: "light" | "dark"): ITheme {
+  if (resolved === "light") {
+    return {
+      background: "#ffffff", foreground: "#15171a", cursor: "#15171a", cursorAccent: "#ffffff",
+      selectionBackground: "rgba(21,23,26,0.14)",
+      black: "#383a42", red: "#d14b46", green: "#4a8f3c", yellow: "#b07d00",
+      blue: "#2f6fdb", magenta: "#9a3fb5", cyan: "#2a8a99", white: "#4b4f55",
+      brightBlack: "#9aa0a6", brightRed: "#e05c55", brightGreen: "#5aa248", brightYellow: "#c2920f",
+      brightBlue: "#3f7eea", brightMagenta: "#ad4fc7", brightCyan: "#319bab", brightWhite: "#15171a",
+    };
+  }
+  return {
+    background: "#0b0c0e", foreground: "#e8e9ea", cursor: "#e8e9ea", cursorAccent: "#0b0c0e",
+    selectionBackground: "rgba(232,233,234,0.18)",
+    black: "#2b2e33", red: "#e06c75", green: "#98c379", yellow: "#e5c07b",
+    blue: "#61afef", magenta: "#c678dd", cyan: "#56b6c2", white: "#d7dae0",
+    brightBlack: "#5f646a", brightRed: "#e6747d", brightGreen: "#a6cf86", brightYellow: "#ecc98a",
+    brightBlue: "#7bbef2", brightMagenta: "#d089e3", brightCyan: "#6fc2cd", brightWhite: "#ffffff",
+  };
+}
 
 type Props = {
   ptySocket: PtySocket;
@@ -45,45 +70,41 @@ function applyMods(data: string, mods: Mods): string {
 export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const settings = useSettings();
+
+  // Apply theme / font size / cursor live, without recreating the terminal.
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    term.options.theme = xtermTheme(settings.resolved);
+    term.options.fontSize = settings.fontSize;
+    term.options.cursorStyle = settings.cursorStyle;
+    try {
+      fitRef.current?.fit();
+    } catch {
+      /* ignore */
+    }
+  }, [settings.resolved, settings.fontSize, settings.cursorStyle]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const s0 = getSettings();
     const term = new XTerm({
       fontFamily: "var(--font-mono)",
-      fontSize: 14,
+      fontSize: s0.fontSize,
       lineHeight: 1.4,
       cursorBlink: true,
+      cursorStyle: s0.cursorStyle,
       scrollback: 10000,
       allowProposedApi: true,
       macOptionIsMeta: true,
-      theme: {
-        background: "#0f1117",
-        foreground: "#e2e8f0",
-        cursor: "#7c6af7",
-        cursorAccent: "#0f1117",
-        selectionBackground: "#3d3578",
-        black: "#1e2130",
-        red: "#f87171",
-        green: "#4ade80",
-        yellow: "#fbbf24",
-        blue: "#60a5fa",
-        magenta: "#c084fc",
-        cyan: "#34d399",
-        white: "#e2e8f0",
-        brightBlack: "#64748b",
-        brightRed: "#f87171",
-        brightGreen: "#4ade80",
-        brightYellow: "#fbbf24",
-        brightBlue: "#93c5fd",
-        brightMagenta: "#d8b4fe",
-        brightCyan: "#6ee7b7",
-        brightWhite: "#f8fafc",
-      },
+      theme: xtermTheme(s0.resolved),
     });
 
     const fitAddon = new FitAddon();
@@ -128,6 +149,7 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
     }
 
     termRef.current = term;
+    fitRef.current = fitAddon;
     searchRef.current = searchAddon;
 
     // Copy/paste/search keyboard shortcuts.
@@ -217,10 +239,10 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
     if (!q) return;
     const opts = {
       decorations: {
-        matchBackground: "#3d3578",
-        activeMatchBackground: "#7c6af7",
-        matchOverviewRuler: "#3d3578",
-        activeMatchColorOverviewRuler: "#7c6af7",
+        matchBackground: "#6b7177",
+        activeMatchBackground: "#e8e9ea",
+        matchOverviewRuler: "#6b7177",
+        activeMatchColorOverviewRuler: "#e8e9ea",
       },
     };
     if (dir === "next") searchRef.current?.findNext(q, opts);
@@ -249,11 +271,11 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
             display: "flex",
             gap: 4,
             alignItems: "center",
-            background: "var(--surface)",
+            background: "var(--bg-elevated)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius)",
             padding: "4px 6px",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.28)",
           }}
         >
           <input
@@ -272,7 +294,7 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
               background: "var(--bg)",
               border: "1px solid var(--border)",
               borderRadius: 4,
-              color: "var(--text)",
+              color: "var(--fg)",
               padding: "3px 6px",
               fontSize: 12,
               fontFamily: "var(--font-mono)",
@@ -293,7 +315,7 @@ const searchBtn: React.CSSProperties = {
   background: "var(--bg)",
   border: "1px solid var(--border)",
   borderRadius: 4,
-  color: "var(--text-muted)",
+  color: "var(--fg-muted)",
   cursor: "pointer",
   fontSize: 12,
   width: 24,

@@ -37,15 +37,17 @@ export default function Login({ onAuthed }: { onAuthed: () => void }) {
           gap: 12,
           width: 280,
           padding: 24,
-          background: "var(--surface)",
+          background: "var(--bg-elevated)",
           border: "1px solid var(--border)",
           borderRadius: 8,
         }}
       >
-        <div style={{ fontWeight: 700, color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 18 }}>
+        <div style={{ fontWeight: 700, color: "var(--fg)", fontFamily: "var(--font-mono)", fontSize: 20, letterSpacing: "-0.02em" }}>
           hearth
         </div>
-        <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Sign in to your terminal</div>
+        <div style={{ color: "var(--fg-subtle)", fontSize: 12, marginTop: -6, marginBottom: 4 }}>
+          your computer, in the browser
+        </div>
         <input
           type="password"
           autoFocus
@@ -56,19 +58,19 @@ export default function Login({ onAuthed }: { onAuthed: () => void }) {
             background: "var(--bg)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius)",
-            color: "var(--text)",
+            color: "var(--fg)",
             padding: "10px 12px",
             fontSize: 14,
             outline: "none",
           }}
         />
-        {error && <div style={{ color: "var(--red)", fontSize: 12 }}>{error}</div>}
+        {error && <div style={{ color: "var(--danger)", fontSize: 12 }}>{error}</div>}
         <button
           type="submit"
           disabled={busy || !password}
           style={{
             background: "var(--accent)",
-            color: "#fff",
+            color: "var(--bg)",
             border: "none",
             borderRadius: "var(--radius)",
             padding: "10px",

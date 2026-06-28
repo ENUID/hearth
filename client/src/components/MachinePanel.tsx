@@ -13,11 +13,11 @@ import {
 const usd = (cents: number) => "$" + (cents / 100).toFixed(cents < 100 ? 4 : 2);
 
 const stateColor: Record<string, string> = {
-  running: "var(--green)",
-  asleep: "var(--text-muted)",
-  waking: "var(--yellow)",
-  provisioning: "var(--yellow)",
-  error: "var(--red)",
+  running: "var(--fg)",
+  asleep: "var(--fg-subtle)",
+  waking: "var(--fg-muted)",
+  provisioning: "var(--fg-muted)",
+  error: "var(--danger)",
 };
 
 export default function MachinePanel({ onClose }: { onClose: () => void }) {
@@ -60,19 +60,19 @@ export default function MachinePanel({ onClose }: { onClose: () => void }) {
     <div onClick={onClose} style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={drawer}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ fontSize: 16, fontFamily: "var(--font-mono)", color: "var(--text)" }}>machine</h2>
+          <h2 style={{ fontSize: 16, fontFamily: "var(--font-mono)", color: "var(--fg)" }}>machine</h2>
           <button onClick={onClose} style={{ ...btn, marginLeft: "auto" }} tabIndex={-1}>✕</button>
         </div>
 
         {!snap ? (
-          <div style={{ color: "var(--text-muted)" }}>loading…</div>
+          <div style={{ color: "var(--fg-muted)" }}>loading…</div>
         ) : (
           <>
             {/* state */}
             <div style={row}>
               <span style={label}>status</span>
               <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: stateColor[m!.state] ?? "var(--text-muted)", fontSize: 9 }}>●</span>
+                <span style={{ color: stateColor[m!.state] ?? "var(--fg-muted)", fontSize: 9 }}>●</span>
                 {m!.state}
               </span>
             </div>
@@ -156,7 +156,7 @@ export default function MachinePanel({ onClose }: { onClose: () => void }) {
               </button>
             </div>
 
-            <div style={{ marginTop: 12, fontSize: 11, color: "var(--text-muted)" }}>
+            <div style={{ marginTop: 12, fontSize: 11, color: "var(--fg-muted)" }}>
               provider: {snap.provider} · billing: {snap.billing.name}{snap.billing.live ? " (live)" : ""}
             </div>
             {msg && <div style={{ marginTop: 8, fontSize: 12, color: "var(--accent)" }}>{msg}</div>}
@@ -179,16 +179,16 @@ const drawer: React.CSSProperties = {
   width: 340,
   maxWidth: "90vw",
   height: "100%",
-  background: "var(--surface)",
+  background: "var(--bg-elevated)",
   borderLeft: "1px solid var(--border)",
   padding: 20,
   overflowY: "auto",
-  color: "var(--text)",
+  color: "var(--fg)",
   fontSize: 13,
 };
 const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", padding: "4px 0" };
-const label: React.CSSProperties = { color: "var(--text-muted)" };
-const section: React.CSSProperties = { marginTop: 18, marginBottom: 8, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)", fontFamily: "var(--font-mono)" };
-const btn: React.CSSProperties = { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", cursor: "pointer", fontSize: 12, padding: "8px 10px" };
-const chip: React.CSSProperties = { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--text)", cursor: "pointer", padding: "8px 6px", textAlign: "center" };
-const activeChip: React.CSSProperties = { border: "1px solid var(--accent)", background: "var(--accent-dim)", color: "var(--accent)" };
+const label: React.CSSProperties = { color: "var(--fg-muted)" };
+const section: React.CSSProperties = { marginTop: 18, marginBottom: 8, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--fg-muted)", fontFamily: "var(--font-mono)" };
+const btn: React.CSSProperties = { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--fg)", cursor: "pointer", fontSize: 12, padding: "8px 10px" };
+const chip: React.CSSProperties = { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--fg)", cursor: "pointer", padding: "8px 6px", textAlign: "center" };
+const activeChip: React.CSSProperties = { border: "1px solid var(--accent)", background: "var(--accent-soft)", color: "var(--accent)" };

@@ -3,19 +3,18 @@ import TerminalTab from "./components/TerminalTab";
 import KeyBar from "./components/KeyBar";
 import Login from "./components/Login";
 import MachinePanel from "./components/MachinePanel";
+import SettingsPanel from "./components/SettingsPanel";
+import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
 import { getConfig, getToken, uploadFile, downloadUrl, getMachine } from "./lib/api";
+import { useSettings, setSettings } from "./lib/settings";
 
 type Mods = { ctrl: boolean; alt: boolean };
 type Tab = { id: string; title: string };
 
 function detectTouch(): boolean {
   if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia?.("(pointer: coarse)").matches ||
-    "ontouchstart" in window ||
-    window.innerWidth < 820
-  );
+  return window.matchMedia?.("(pointer: coarse)").matches || "ontouchstart" in window || window.innerWidth < 820;
 }
 
 function loadTabs(): Tab[] {
@@ -29,17 +28,16 @@ function loadTabs(): Tab[] {
 }
 
 export default function App() {
+  const settings = useSettings();
+
   // --- auth ---
   const [authResolved, setAuthResolved] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
   useEffect(() => {
-    getConfig()
-      .then((c) => setNeedsLogin(c.authRequired && !getToken()))
-      .catch(() => {})
-      .finally(() => setAuthResolved(true));
+    getConfig().then((c) => setNeedsLogin(c.authRequired && !getToken())).catch(() => {}).finally(() => setAuthResolved(true));
   }, []);
 
-  // --- tabs / sessions ---
+  // --- tabs ---
   const [tabs, setTabs] = useState<Tab[]>(loadTabs);
   const [activeId, setActiveId] = useState<string>(() => localStorage.getItem("hearth_active") || loadTabs()[0].id);
   const activeIdRef = useRef(activeId);
@@ -63,12 +61,12 @@ export default function App() {
     ptys.current.get(activeIdRef.current)?.send(data);
   }, []);
 
-  function newTab() {
+  const newTab = useCallback(() => {
     const id = "s-" + Date.now().toString(36);
     setTabs((prev) => [...prev, { id, title: String(prev.length + 1) }]);
     setActiveId(id);
-  }
-  function closeTab(id: string) {
+  }, []);
+  const closeTab = useCallback((id: string) => {
     import("./lib/api").then((m) => m.killSession(id));
     setTabs((prev) => {
       const idx = prev.findIndex((t) => t.id === id);
@@ -77,7 +75,15 @@ export default function App() {
       if (activeIdRef.current === id) setActiveId((next[Math.max(0, idx - 1)] ?? next[0]).id);
       return next;
     });
-  }
+  }, []);
+  const cycleTab = useCallback((dir: 1 | -1) => {
+    setTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === activeIdRef.current);
+      const next = prev[(idx + dir + prev.length) % prev.length];
+      if (next) setActiveId(next.id);
+      return prev;
+    });
+  }, []);
 
   // --- modifiers (mobile key bar) ---
   const modifiersRef = useRef<Mods>({ ctrl: false, alt: false });
@@ -90,29 +96,7 @@ export default function App() {
   const toggleAlt = useCallback(() => apply({ ctrl: modifiersRef.current.ctrl, alt: !modifiersRef.current.alt }), [apply]);
   const clearMods = useCallback(() => apply({ ctrl: false, alt: false }), [apply]);
 
-  // --- machine status (Phase 2 control plane) ---
-  const [machineOpen, setMachineOpen] = useState(false);
-  const [machineState, setMachineState] = useState<string>("");
-  useEffect(() => {
-    let stop = false;
-    const poll = () =>
-      getMachine()
-        .then((s) => !stop && setMachineState(s.machine?.state ?? ""))
-        .catch(() => {});
-    poll();
-    const t = setInterval(poll, 8000);
-    return () => {
-      stop = true;
-      clearInterval(t);
-    };
-  }, []);
-
-  const [showKeyBar, setShowKeyBar] = useState(detectTouch);
-  useEffect(() => {
-    const onResize = () => setShowKeyBar(detectTouch());
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const showKeyBar = settings.keyBar === "on" || (settings.keyBar === "auto" && detectTouch());
 
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -129,21 +113,32 @@ export default function App() {
     };
   }, [showKeyBar]);
 
+  // --- machine status ---
+  const [machineOpen, setMachineOpen] = useState(false);
+  const [machineState, setMachineState] = useState<string>("");
+  useEffect(() => {
+    let stop = false;
+    const poll = () => getMachine().then((s) => !stop && setMachineState(s.machine?.state ?? "")).catch(() => {});
+    poll();
+    const t = setInterval(poll, 8000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, []);
+
   // --- file transfer ---
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
     for (const f of Array.from(files)) {
       setStatus(`uploading ${f.name}…`);
-      const r: { ok?: boolean; path?: string; error?: string } = await uploadFile(
-        activeIdRef.current,
-        f
-      ).catch(() => ({ error: "failed" }));
-      setStatus(r.ok ? `uploaded ${f.name} → ${r.path}` : `upload failed: ${r.error ?? ""}`);
+      const r: { ok?: boolean; path?: string; error?: string } = await uploadFile(activeIdRef.current, f).catch(() => ({ error: "failed" }));
+      setStatus(r.ok ? `uploaded ${f.name}` : `upload failed: ${r.error ?? ""}`);
     }
     setTimeout(() => setStatus(""), 4000);
   }, []);
-  function download() {
+  const download = useCallback(() => {
     const p = window.prompt("Download which file? (path relative to the current directory)");
     if (!p) return;
     const a = document.createElement("a");
@@ -152,7 +147,38 @@ export default function App() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }
+  }, []);
+
+  // --- command palette ---
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const cycleTheme = useCallback(() => {
+    const order = ["system", "light", "dark"] as const;
+    setSettings({ theme: order[(order.indexOf(settings.theme) + 1) % order.length] });
+  }, [settings.theme]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const commands: Command[] = [
+    { id: "new-tab", title: "New tab", hint: "tabs", run: newTab },
+    { id: "close-tab", title: "Close current tab", hint: "tabs", run: () => closeTab(activeIdRef.current) },
+    { id: "next-tab", title: "Next tab", hint: "tabs", run: () => cycleTab(1) },
+    { id: "prev-tab", title: "Previous tab", hint: "tabs", run: () => cycleTab(-1) },
+    { id: "machine", title: "Machine: size, GPU, usage", hint: "machine", run: () => setMachineOpen(true) },
+    { id: "settings", title: "Settings", hint: "app", run: () => setSettingsOpen(true) },
+    { id: "theme", title: `Theme: ${settings.theme} → next`, hint: "app", run: cycleTheme },
+    { id: "upload", title: "Upload file…", hint: "files", run: () => fileInputRef.current?.click() },
+    { id: "download", title: "Download file…", hint: "files", run: download },
+  ];
 
   if (!authResolved) return null;
   if (needsLogin) return <Login onAuthed={() => setNeedsLogin(false)} />;
@@ -161,29 +187,22 @@ export default function App() {
     <div ref={rootRef} style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       {/* header */}
       <div style={headerStyle}>
-        <span style={{ fontWeight: 700, color: "var(--accent)", letterSpacing: "-0.02em", fontFamily: "var(--font-mono)" }}>
+        <span style={{ fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em", fontFamily: "var(--font-mono)", fontSize: 13 }}>
           hearth
         </span>
 
+        <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 10px" }} />
+
         {/* tabs */}
-        <div style={{ display: "flex", gap: 4, marginLeft: 8, overflowX: "auto", flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 2, overflowX: "auto", flex: 1 }}>
           {tabs.map((t) => (
-            <div
+            <button
               key={t.id}
               onClick={() => setActiveId(t.id)}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "3px 8px",
-                borderRadius: "var(--radius)",
-                fontFamily: "var(--font-mono)",
-                fontSize: 12,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                background: t.id === activeId ? "var(--accent-dim)" : "transparent",
-                color: t.id === activeId ? "var(--accent)" : "var(--text-muted)",
-                border: "1px solid " + (t.id === activeId ? "var(--accent-dim)" : "var(--border)"),
+                ...tabChip,
+                color: t.id === activeId ? "var(--fg)" : "var(--fg-subtle)",
+                background: t.id === activeId ? "var(--accent-soft)" : "transparent",
               }}
             >
               {t.title}
@@ -192,32 +211,32 @@ export default function App() {
                   e.stopPropagation();
                   closeTab(t.id);
                 }}
-                style={{ opacity: 0.6, fontSize: 13, lineHeight: 1 }}
                 title="close tab"
+                style={{ opacity: 0.5, fontSize: 13, lineHeight: 1 }}
               >
                 ×
               </span>
-            </div>
+            </button>
           ))}
-          <button onClick={newTab} title="new tab" style={iconBtn}>
-            +
-          </button>
+          <button onClick={newTab} title="new tab" style={{ ...ghostBtn, fontSize: 15, padding: "2px 7px" }}>+</button>
         </div>
 
-        {/* machine */}
-        <button onClick={() => setMachineOpen(true)} title="machine: size, GPU, usage" style={{ ...iconBtn, display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{ color: MACHINE_STATE_COLOR[machineState] ?? "var(--text-muted)", fontSize: 9 }}>●</span>
-          machine
+        {status && <span style={{ color: "var(--fg-muted)", fontSize: 11, marginRight: 8 }}>{status}</span>}
+
+        {/* machine status */}
+        <button onClick={() => setMachineOpen(true)} title="machine" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ color: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", fontSize: 8 }}>●</span>
+          <span style={{ color: "var(--fg-muted)" }}>{machineState || "machine"}</span>
         </button>
 
-        {/* file transfer */}
-        {status && <span style={{ color: "var(--text-muted)", fontSize: 11, marginRight: 8 }}>{status}</span>}
-        <button onClick={() => fileInputRef.current?.click()} title="upload file" style={iconBtn}>
-          upload
+        {/* command palette hint */}
+        <button onClick={() => setPaletteOpen(true)} title="command palette (⌘K)" style={{ ...ghostBtn, fontFamily: "var(--font-mono)", color: "var(--fg-subtle)" }}>
+          ⌘K
         </button>
-        <button onClick={download} title="download file" style={iconBtn}>
-          download
-        </button>
+
+        {/* settings */}
+        <button onClick={() => setSettingsOpen(true)} title="settings" style={ghostBtn}>⚙</button>
+
         <input
           ref={fileInputRef}
           type="file"
@@ -230,7 +249,7 @@ export default function App() {
         />
       </div>
 
-      {/* terminals (drag-drop upload target) */}
+      {/* terminals */}
       <div
         style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 0 }}
         onDragOver={(e) => e.preventDefault()}
@@ -240,32 +259,25 @@ export default function App() {
         }}
       >
         {tabs.map((t) => (
-          <TerminalTab
-            key={t.id}
-            sid={t.id}
-            active={t.id === activeId}
-            modifiersRef={modifiersRef}
-            onConsumeModifiers={clearMods}
-            register={register}
-          />
+          <TerminalTab key={t.id} sid={t.id} active={t.id === activeId} modifiersRef={modifiersRef} onConsumeModifiers={clearMods} register={register} />
         ))}
       </div>
 
-      {/* mobile key bar */}
       {showKeyBar && <KeyBar onSend={sendToActive} mods={mods} onToggleCtrl={toggleCtrl} onToggleAlt={toggleAlt} />}
 
-      {/* machine control panel */}
       {machineOpen && <MachinePanel onClose={() => setMachineOpen(false)} />}
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      {paletteOpen && <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />}
     </div>
   );
 }
 
 const MACHINE_STATE_COLOR: Record<string, string> = {
-  running: "var(--green)",
-  asleep: "var(--text-muted)",
-  waking: "var(--yellow)",
-  provisioning: "var(--yellow)",
-  error: "var(--red)",
+  running: "var(--fg)",
+  asleep: "var(--fg-subtle)",
+  waking: "var(--fg-muted)",
+  provisioning: "var(--fg-muted)",
+  error: "var(--danger)",
 };
 
 const headerStyle: React.CSSProperties = {
@@ -273,20 +285,33 @@ const headerStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   padding: "0 12px",
-  gap: 6,
+  gap: 4,
   borderBottom: "1px solid var(--border)",
-  background: "var(--surface)",
+  background: "var(--bg-elevated)",
   flexShrink: 0,
 };
 
-const iconBtn: React.CSSProperties = {
-  background: "var(--bg)",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius)",
-  color: "var(--text-muted)",
+const ghostBtn: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  borderRadius: "var(--radius-sm)",
+  color: "var(--fg-muted)",
   cursor: "pointer",
   fontSize: 12,
+  padding: "4px 8px",
+  whiteSpace: "nowrap",
+};
+
+const tabChip: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "3px 10px",
+  borderRadius: "var(--radius-sm)",
+  border: "none",
+  background: "transparent",
   fontFamily: "var(--font-mono)",
-  padding: "3px 8px",
+  fontSize: 12,
+  cursor: "pointer",
   whiteSpace: "nowrap",
 };
