@@ -63,6 +63,17 @@ A complete terminal, not a demo:
 
 ## Run it
 
+### Fastest: GitHub Codespaces (works on a phone/iPad)
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ENUID/hearth)
+
+Open **https://codespaces.new/ENUID/hearth** (signed in to GitHub). The devcontainer
+installs, builds, and starts Hearth automatically on port **8080** and forwards it —
+the preview URL (`https://…-8080.app.github.dev`) opens in your browser, including on
+iPad. No local setup. (Private repo → uses your Codespaces quota.)
+
+### Local
+
 ```bash
 # install deps for both packages
 npm install && npm run install:all
