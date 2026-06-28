@@ -72,6 +72,21 @@ installs, builds, and starts Hearth automatically on port **8080** and forwards 
 the preview URL (`https://…-8080.app.github.dev`) opens in your browser, including on
 iPad. No local setup. (Private repo → uses your Codespaces quota.)
 
+**Live preview that auto-updates on every push** — in the Codespace terminal:
+
+```bash
+npm run autopreview
+```
+
+This builds, serves on port 8080, and then watches the repo: whenever new commits
+are pushed it auto-pulls, rebuilds, and restarts — just refresh the tab to see
+changes. To expose it publicly (Ports tab → Port Visibility → Public), set a
+password first:
+
+```bash
+HEARTH_REQUIRE_AUTH=true HEARTH_PASSWORD=secret HEARTH_JWT_SECRET=$(openssl rand -hex 16) npm run autopreview
+```
+
 ### Local
 
 ```bash
