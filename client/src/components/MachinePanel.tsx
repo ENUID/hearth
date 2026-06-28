@@ -20,18 +20,18 @@ const stateColor: Record<string, string> = {
   error: "var(--danger)",
 };
 
-export default function MachinePanel({ onClose }: { onClose: () => void }) {
+export default function MachinePanel({ onClose, ws = "workspace" }: { onClose: () => void; ws?: string }) {
   const [snap, setSnap] = useState<MachineSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
   const refresh = useCallback(async () => {
     try {
-      setSnap(await getMachine());
+      setSnap(await getMachine(ws));
     } catch (e) {
       setMsg((e as Error).message);
     }
-  }, []);
+  }, [ws]);
 
   useEffect(() => {
     refresh();
@@ -60,7 +60,9 @@ export default function MachinePanel({ onClose }: { onClose: () => void }) {
     <div onClick={onClose} style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={drawer}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ fontSize: 16, fontFamily: "var(--font-mono)", color: "var(--fg)" }}>machine</h2>
+          <h2 style={{ fontSize: 16, fontFamily: "var(--font-mono)", color: "var(--fg)" }}>
+            machine <span style={{ color: "var(--fg-subtle)", fontSize: 12 }}>· {ws}</span>
+          </h2>
           <button onClick={onClose} style={{ ...btn, marginLeft: "auto" }} tabIndex={-1}>✕</button>
         </div>
 
@@ -88,7 +90,7 @@ export default function MachinePanel({ onClose }: { onClose: () => void }) {
                 <button
                   key={key}
                   disabled={busy}
-                  onClick={() => act(() => resizeMachine(key), `resizing to ${t.label}…`)}
+                  onClick={() => act(() => resizeMachine(key, ws), `resizing to ${t.label}…`)}
                   style={{ ...chip, flex: 1, ...(m!.tier === key ? activeChip : {}) }}
                 >
                   <div style={{ fontWeight: 600 }}>{t.label}</div>
@@ -106,14 +108,14 @@ export default function MachinePanel({ onClose }: { onClose: () => void }) {
                   <span style={label}>{gpu!.spec.label}</span>
                   <span>{gpu!.state === "provisioning" ? "provisioning…" : `${gpu!.spec.vramGb} GB · ${usd(gpu!.spec.hourlyCents)}/hr`}</span>
                 </div>
-                <button disabled={busy} onClick={() => act(releaseGpu, "releasing GPU…")} style={{ ...btn, width: "100%", marginTop: 6 }}>
+                <button disabled={busy} onClick={() => act(() => releaseGpu(ws), "releasing GPU…")} style={{ ...btn, width: "100%", marginTop: 6 }}>
                   release GPU
                 </button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 6 }}>
                 {Object.entries(snap.gpuCatalog).map(([key, g]) => (
-                  <button key={key} disabled={busy} onClick={() => act(() => provisionGpu(key), `provisioning ${g.label}…`)} style={{ ...chip, flex: 1 }}>
+                  <button key={key} disabled={busy} onClick={() => act(() => provisionGpu(key, ws), `provisioning ${g.label}…`)} style={{ ...chip, flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>{g.type.toUpperCase()}</div>
                     <div style={{ fontSize: 10, opacity: 0.8 }}>{g.vramGb} GB</div>
                     <div style={{ fontSize: 10, opacity: 0.8 }}>{usd(g.hourlyCents)}/hr</div>
@@ -133,9 +135,9 @@ export default function MachinePanel({ onClose }: { onClose: () => void }) {
             {/* actions */}
             <div style={{ display: "flex", gap: 6, marginTop: 16 }}>
               {m!.state === "asleep" ? (
-                <button disabled={busy} onClick={() => act(wakeMachine, "waking…")} style={{ ...btn, flex: 1 }}>wake</button>
+                <button disabled={busy} onClick={() => act(() => wakeMachine(ws), "waking…")} style={{ ...btn, flex: 1 }}>wake</button>
               ) : (
-                <button disabled={busy} onClick={() => act(sleepMachine, "sleeping…")} style={{ ...btn, flex: 1 }}>sleep now</button>
+                <button disabled={busy} onClick={() => act(() => sleepMachine(ws), "sleeping…")} style={{ ...btn, flex: 1 }}>sleep now</button>
               )}
               <button
                 disabled={busy}

@@ -92,11 +92,13 @@ export interface MachineSnapshot {
   billing: { name: string; live: boolean };
 }
 
-export const getMachine = (): Promise<MachineSnapshot> => authedJson("/api/machine");
-export const resizeMachine = (tier: string): Promise<MachineSnapshot> => authedJson("/api/machine/resize", { method: "POST", body: { tier } });
-export const provisionGpu = (type: string): Promise<MachineSnapshot> => authedJson("/api/machine/gpu", { method: "POST", body: { type } });
-export const releaseGpu = (): Promise<MachineSnapshot> => authedJson("/api/machine/gpu", { method: "DELETE" });
-export const sleepMachine = (): Promise<MachineSnapshot> => authedJson("/api/machine/sleep", { method: "POST" });
-export const wakeMachine = (): Promise<MachineSnapshot> => authedJson("/api/machine/wake", { method: "POST" });
+const W = (ws: string) => encodeURIComponent(ws);
+export const getMachine = (ws = "workspace"): Promise<MachineSnapshot> => authedJson(`/api/machine?ws=${W(ws)}`);
+export const resizeMachine = (tier: string, ws = "workspace"): Promise<MachineSnapshot> => authedJson("/api/machine/resize", { method: "POST", body: { tier, ws } });
+export const provisionGpu = (type: string, ws = "workspace"): Promise<MachineSnapshot> => authedJson("/api/machine/gpu", { method: "POST", body: { type, ws } });
+export const releaseGpu = (ws = "workspace"): Promise<MachineSnapshot> => authedJson(`/api/machine/gpu?ws=${W(ws)}`, { method: "DELETE" });
+export const sleepMachine = (ws = "workspace"): Promise<MachineSnapshot> => authedJson("/api/machine/sleep", { method: "POST", body: { ws } });
+export const wakeMachine = (ws = "workspace"): Promise<MachineSnapshot> => authedJson("/api/machine/wake", { method: "POST", body: { ws } });
+export const getWorkspaces = (): Promise<{ workspaces: { id: string; state: string; tier: string }[] }> => authedJson("/api/workspaces");
 export const chargeNow = (): Promise<{ invoice: { totalCents: number }; result: { status: string; provider: string; amountCents: number } }> =>
   authedJson("/api/billing/charge", { method: "POST" });

@@ -89,7 +89,7 @@ To require a password, set `HEARTH_REQUIRE_AUTH=true`, `HEARTH_PASSWORD`, and `H
 
 - **Phase 1** ✅ — A real, fully-capable cloud terminal from any device.
 - **Phase 2** ✅ (control plane) — Resize CPU/RAM/GPU on demand, scale-to-zero, metering + billing. Local backend is built and tested; Docker/Kubernetes/Stripe are real adapters that activate with the matching environment/credentials.
-- **Phase 3** — Teams, multiple workspaces, and self-host.
+- **Phase 3** (in progress) — Multiple workspaces ✅ (each its own machine, tabs, and home); next: multi-user teams and self-host packaging.
 
 ## Tech
 

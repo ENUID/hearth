@@ -4,6 +4,13 @@ import { WebSocket } from "ws";
 import { loadBuffer, saveBuffer, deleteBuffer } from "./persistence";
 import { manager, WORKSPACE_ID } from "./controlplane/index";
 
+// Tab session ids are namespaced as "<workspace>__<tab>"; activity on any tab
+// counts toward that workspace's machine (Phase 3).
+function workspaceOf(sid: string): string {
+  const i = sid.indexOf("__");
+  return i > 0 ? sid.slice(0, i) : WORKSPACE_ID;
+}
+
 type Session = {
   ptyProcess: pty.IPty;
   lastActive: number;
@@ -58,7 +65,7 @@ function getOrCreateSession(sid: string): Session {
       session.buffer = session.buffer.slice(session.buffer.length - MAX_BUFFER);
     }
     saveBuffer(sid, session.buffer);
-    manager.markActive(WORKSPACE_ID);
+    manager.markActive(workspaceOf(sid));
     const bytes = Buffer.from(data, "utf8");
     for (const ws of session.sockets) {
       if (ws.readyState === WebSocket.OPEN) ws.send(bytes, { binary: true });
@@ -71,7 +78,7 @@ function getOrCreateSession(sid: string): Session {
 
 export function handlePtyConnection(ws: WebSocket, sid: string) {
   // Opening a terminal counts as activity: wake the workspace machine if asleep.
-  void manager.touch(WORKSPACE_ID);
+  void manager.touch(workspaceOf(sid));
   const session = getOrCreateSession(sid);
   const { ptyProcess } = session;
 
@@ -95,7 +102,7 @@ export function handlePtyConnection(ws: WebSocket, sid: string) {
       ? raw
       : Buffer.from(raw);
     session.lastActive = Date.now();
-    manager.markActive(WORKSPACE_ID);
+    manager.markActive(workspaceOf(sid));
 
     // Text frames may be control frames (JSON) or keystrokes. Binary frames are
     // always raw terminal input. Note: `ws` delivers every frame as a Buffer, so

@@ -5,17 +5,23 @@ import { GPU_CATALOG, TIERS, type Tier } from "./types";
 
 type AuthFn = (req: Request) => boolean;
 
-function snapshot() {
-  const machine = manager.get(WORKSPACE_ID) ?? null;
-  const usage = manager.usageFor(WORKSPACE_ID);
+// Phase 3: each workspace is its own machine. The workspace id comes from the
+// request (?ws= or body.ws); defaults to the single legacy workspace.
+function wsId(req: Request): string {
+  const id = String(req.query.ws ?? req.body?.ws ?? WORKSPACE_ID).trim();
+  return id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || WORKSPACE_ID;
+}
+
+function snapshot(ws: string) {
   return {
-    machine,
-    usage,
+    machine: manager.get(ws) ?? null,
+    usage: manager.usageFor(ws),
     tiers: TIERS,
     gpuCatalog: GPU_CATALOG,
     provider: provider.name,
     gpuBackend: manager.gpuBackendName(),
     billing: { name: billing.name, live: billing.live },
+    workspace: ws,
   };
 }
 
@@ -34,48 +40,54 @@ export function mountControlPlane(app: Express, isAuthed: AuthFn): void {
       }
     };
 
-  app.get("/api/machine", guard(async (_req, res) => {
-    await manager.getOrCreate(WORKSPACE_ID);
-    res.json(snapshot());
+  app.get("/api/machine", guard(async (req, res) => {
+    const ws = wsId(req);
+    await manager.getOrCreate(ws);
+    res.json(snapshot(ws));
   }));
 
   app.post("/api/machine/resize", guard(async (req, res) => {
     const tier = String(req.body?.tier ?? "") as Tier;
     if (!TIERS[tier]) throw new Error("invalid tier");
-    await manager.resize(WORKSPACE_ID, tier);
-    res.json(snapshot());
+    await manager.resize(wsId(req), tier);
+    res.json(snapshot(wsId(req)));
   }));
 
-  app.post("/api/machine/wake", guard(async (_req, res) => {
-    await manager.touch(WORKSPACE_ID);
-    res.json(snapshot());
+  app.post("/api/machine/wake", guard(async (req, res) => {
+    await manager.touch(wsId(req));
+    res.json(snapshot(wsId(req)));
   }));
 
-  app.post("/api/machine/sleep", guard(async (_req, res) => {
-    await manager.sleep(WORKSPACE_ID);
-    res.json(snapshot());
+  app.post("/api/machine/sleep", guard(async (req, res) => {
+    await manager.sleep(wsId(req));
+    res.json(snapshot(wsId(req)));
   }));
 
   app.post("/api/machine/gpu", guard(async (req, res) => {
-    const type = String(req.body?.type ?? "");
-    await manager.provisionGpu(WORKSPACE_ID, type);
-    res.json(snapshot());
+    await manager.provisionGpu(wsId(req), String(req.body?.type ?? ""));
+    res.json(snapshot(wsId(req)));
   }));
 
-  app.delete("/api/machine/gpu", guard(async (_req, res) => {
-    await manager.releaseGpu(WORKSPACE_ID);
-    res.json(snapshot());
+  app.delete("/api/machine/gpu", guard(async (req, res) => {
+    await manager.releaseGpu(wsId(req));
+    res.json(snapshot(wsId(req)));
   }));
 
-  app.get("/api/usage", guard(async (_req, res) => {
-    const usage = manager.usageFor(WORKSPACE_ID);
+  // All workspaces (for the switcher) with light status.
+  app.get("/api/workspaces", guard(async (_req, res) => {
+    res.json({ workspaces: manager.list().map((m) => ({ id: m.id, state: m.state, tier: m.tier })) });
+  }));
+
+  app.get("/api/usage", guard(async (req, res) => {
+    const usage = manager.usageFor(wsId(req));
     res.json({ usage, invoice: buildInvoice(usage) });
   }));
 
   app.post("/api/billing/charge", guard(async (_req, res) => {
-    const usage = manager.usageFor(WORKSPACE_ID);
-    const invoice = buildInvoice(usage);
-    const result = await billing.charge(invoice.totalCents, "Hearth usage");
-    res.json({ invoice, result });
+    // Bill across all workspaces (one account).
+    let total = 0;
+    for (const m of manager.list()) total += manager.usageFor(m.id).totalCents;
+    const result = await billing.charge(Math.round(total), "Hearth usage");
+    res.json({ invoice: { totalCents: Math.round(total) }, result });
   }));
 }

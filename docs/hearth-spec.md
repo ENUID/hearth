@@ -246,7 +246,11 @@ fallback. API: `GET /api/machine`, `POST /api/machine/{resize,wake,sleep,gpu}`,
 
 ### Phase 3 — Teams, workspaces, self-host
 
-Multi-user orgs, multiple persistent workspaces, self-hosted enterprise deployments.
+- [x] Multiple workspaces: each workspace is its own machine + tabs + persistent
+      home, switchable in the UI. Sessions are namespaced `<workspace>__<tab>`;
+      the control plane keys a machine per workspace; billing aggregates across them.
+- [ ] Multi-user accounts and teams (shared workspaces, roles)
+- [ ] Self-host packaging polish (one-command deploy, org settings)
 
 ---
 
