@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import express from "express";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
@@ -59,6 +61,18 @@ app.post("/api/session/kill", (req, res) => {
 
 // Phase 2 control plane: machine sizing, scale-to-zero, GPU, metering, billing.
 mountControlPlane(app, (req) => isAuthorized(req, reqUrl(req)));
+
+// Serve the built client so a single port serves the whole app (production /
+// single-origin). In dev you use the Vite server on :5173 instead.
+const clientDist = path.resolve(__dirname, "../../client/dist");
+if (fs.existsSync(path.join(clientDist, "index.html"))) {
+  app.use(express.static(clientDist));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api") || req.path === "/health") return next();
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+  console.log(`  serving client from ${clientDist}`);
+}
 
 const httpServer = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
