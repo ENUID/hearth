@@ -105,6 +105,20 @@ For the full containerized experience (terminal + persistent Linux workspace):
 docker compose -f docker/docker-compose.yml up --build
 ```
 
+### Deploy a permanent public URL (auto-updates on every push)
+
+Hearth is a long-lived WebSocket/PTY server, so it needs a **container host** —
+not a serverless platform like Vercel/Netlify (those can't run the terminal
+backend). The repo ships a production `Dockerfile` (builds client + server,
+serves on one port) and a Render blueprint:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/ENUID/hearth)
+
+**Render** (easiest): New → Blueprint → pick this repo. It builds `./Dockerfile`,
+gives you `https://<name>.onrender.com`, and **auto-redeploys on every push**.
+Auth is on by default — the generated password is in the service's *Environment*
+tab (`HEARTH_PASSWORD`). Works on **Fly.io / Railway** too (same `Dockerfile`).
+
 To require a password, set `HEARTH_REQUIRE_AUTH=true`, `HEARTH_PASSWORD`, and `HEARTH_JWT_SECRET` (see `.env.example`).
 
 ## Status

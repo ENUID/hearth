@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+.git
+.github
+.devcontainer
+deploy
+docs
+*.log
+.verify-*.png
+.env

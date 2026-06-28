@@ -1,0 +1,23 @@
+# Render Blueprint: deploy Hearth as a Docker web service with a public URL that
+# auto-redeploys on every push to the default branch.
+#
+# Use: render.com → New → Blueprint → pick this repo. Render builds ./Dockerfile,
+# serves on its $PORT, and gives you https://<name>.onrender.com.
+#
+# Auth is ON: a random password is generated — read it in the Render dashboard
+# under the service's Environment tab (HEARTH_PASSWORD) and use it to sign in.
+services:
+  - type: web
+    name: hearth
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: HEARTH_REQUIRE_AUTH
+        value: "true"
+      - key: HEARTH_PASSWORD
+        generateValue: true
+      - key: HEARTH_JWT_SECRET
+        generateValue: true
