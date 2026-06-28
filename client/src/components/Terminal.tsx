@@ -13,6 +13,9 @@ import { useSettings, getSettings } from "../lib/settings";
 
 type Mods = { ctrl: boolean; alt: boolean };
 
+const FONT_STACK =
+  'ui-monospace, "JetBrains Mono", "Cascadia Code", "Fira Code", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace';
+
 // The chrome is monochrome, but the terminal keeps real ANSI colors so CLI
 // output stays readable — tuned for each theme.
 function xtermTheme(resolved: "light" | "dark"): ITheme {
@@ -96,9 +99,11 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
 
     const s0 = getSettings();
     const term = new XTerm({
-      fontFamily: "var(--font-mono)",
+      // A concrete font stack — xterm measures glyphs on a canvas and cannot
+      // resolve CSS variables, which mis-sizes cells (huge letter gaps).
+      fontFamily: FONT_STACK,
       fontSize: s0.fontSize,
-      lineHeight: 1.4,
+      lineHeight: 1.2,
       cursorBlink: true,
       cursorStyle: s0.cursorStyle,
       scrollback: 10000,
