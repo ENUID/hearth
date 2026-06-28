@@ -1,7 +1,11 @@
-import { useEffect, useRef, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { SearchAddon } from "@xterm/addon-search";
+import { ClipboardAddon } from "@xterm/addon-clipboard";
+import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import type { PtySocket } from "../hooks/usePtySocket";
 
@@ -14,6 +18,16 @@ type Props = {
   /** Called after a sticky modifier is consumed, so the UI can clear it. */
   onConsumeModifiers?: () => void;
 };
+
+// Only enable the GPU renderer when a real WebGL2 context can be created.
+function supportsWebgl2(): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    return !!canvas.getContext("webgl2");
+  } catch {
+    return false;
+  }
+}
 
 // Apply a sticky Ctrl/Alt to a single typed character.
 function applyMods(data: string, mods: Mods): string {
@@ -31,7 +45,10 @@ function applyMods(data: string, mods: Mods): string {
 export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchRef = useRef<SearchAddon | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -40,6 +57,10 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
       fontFamily: "var(--font-mono)",
       fontSize: 14,
       lineHeight: 1.4,
+      cursorBlink: true,
+      scrollback: 10000,
+      allowProposedApi: true,
+      macOptionIsMeta: true,
       theme: {
         background: "#0f1117",
         foreground: "#e2e8f0",
@@ -63,22 +84,77 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
         brightCyan: "#6ee7b7",
         brightWhite: "#f8fafc",
       },
-      allowProposedApi: true,
-      scrollback: 5000,
     });
 
     const fitAddon = new FitAddon();
-    const webLinksAddon = new WebLinksAddon();
+    const searchAddon = new SearchAddon();
     term.loadAddon(fitAddon);
-    term.loadAddon(webLinksAddon);
+    term.loadAddon(new WebLinksAddon());
+    term.loadAddon(searchAddon);
+    term.loadAddon(new ClipboardAddon()); // OSC 52: programs can read/write clipboard
+
+    // Wide-character / emoji width handling.
+    const unicode11 = new Unicode11Addon();
+    term.loadAddon(unicode11);
+    term.unicode.activeVersion = "11";
+
     term.open(containerRef.current);
 
+    // GPU rendering for speed; fall back silently to the DOM renderer if WebGL
+    // is unavailable (headless, blocklisted GPUs, context loss). Only attempt
+    // when a real WebGL2 context is available, and guard disposal — a failed
+    // context leaves the addon half-initialized and its dispose() throws.
+    let webgl: WebglAddon | null = null;
+    if (supportsWebgl2()) {
+      try {
+        webgl = new WebglAddon();
+        webgl.onContextLoss(() => {
+          try {
+            webgl?.dispose();
+          } catch {
+            /* ignore */
+          }
+          webgl = null;
+        });
+        term.loadAddon(webgl);
+      } catch {
+        try {
+          webgl?.dispose();
+        } catch {
+          /* ignore */
+        }
+        webgl = null;
+      }
+    }
+
     termRef.current = term;
-    fitAddonRef.current = fitAddon;
+    searchRef.current = searchAddon;
+
+    // Copy/paste/search keyboard shortcuts.
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== "keydown") return true;
+      const ctrlShift = (e.ctrlKey || e.metaKey) && e.shiftKey;
+      if (ctrlShift && e.code === "KeyC") {
+        const sel = term.getSelection();
+        if (sel) {
+          navigator.clipboard?.writeText(sel).catch(() => {});
+          return false;
+        }
+      }
+      if (ctrlShift && e.code === "KeyV") {
+        navigator.clipboard?.readText().then((t) => t && ptySocket.send(t)).catch(() => {});
+        return false;
+      }
+      if (ctrlShift && e.code === "KeyF") {
+        setSearchOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+        return false;
+      }
+      return true;
+    });
 
     // Fit only when the element has a real size AND xterm's renderer has computed
     // its cell dimensions — otherwise FitAddon throws "reading 'dimensions'".
-    // Returns true once a fit actually happened.
     const safeFit = (): boolean => {
       const el = containerRef.current;
       if (!el || el.clientWidth === 0 || el.clientHeight === 0) return false;
@@ -112,7 +188,6 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
     });
     ro.observe(containerRef.current);
 
-    // Retry the initial fit until the renderer is ready and the socket is up.
     requestAnimationFrame(() => safeFit());
     let fitted = false;
     const timer = setInterval(() => {
@@ -124,20 +199,103 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
       clearInterval(timer);
       unsubData();
       ro.disconnect();
-      term.dispose();
+      try {
+        webgl?.dispose();
+      } catch {
+        /* a half-initialized WebGL context can throw on dispose */
+      }
+      webgl = null;
+      try {
+        term.dispose();
+      } catch {
+        /* ignore */
+      }
     };
   }, [ptySocket]);
 
+  function runSearch(q: string, dir: "next" | "prev") {
+    if (!q) return;
+    const opts = {
+      decorations: {
+        matchBackground: "#3d3578",
+        activeMatchBackground: "#7c6af7",
+        matchOverviewRuler: "#3d3578",
+        activeMatchColorOverviewRuler: "#7c6af7",
+      },
+    };
+    if (dir === "next") searchRef.current?.findNext(q, opts);
+    else searchRef.current?.findPrevious(q, opts);
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    searchRef.current?.clearDecorations();
+    termRef.current?.focus();
+  }
+
   return (
-    <div
-      ref={containerRef}
-      style={{
-        flex: 1,
-        padding: "8px 4px 4px 8px",
-        background: "var(--bg)",
-        overflow: "hidden",
-        height: "100%",
-      }}
-    />
+    <div style={{ position: "relative", flex: 1, overflow: "hidden", height: "100%" }}>
+      <div
+        ref={containerRef}
+        style={{ width: "100%", height: "100%", padding: "8px 4px 4px 8px", background: "var(--bg)" }}
+      />
+
+      {searchOpen && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 12,
+            display: "flex",
+            gap: 4,
+            alignItems: "center",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            padding: "4px 6px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+          }}
+        >
+          <input
+            ref={searchInputRef}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              runSearch(e.target.value, "next");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") runSearch(query, e.shiftKey ? "prev" : "next");
+              else if (e.key === "Escape") closeSearch();
+            }}
+            placeholder="search…"
+            style={{
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              color: "var(--text)",
+              padding: "3px 6px",
+              fontSize: 12,
+              fontFamily: "var(--font-mono)",
+              outline: "none",
+              width: 160,
+            }}
+          />
+          <button onClick={() => runSearch(query, "prev")} style={searchBtn} tabIndex={-1}>↑</button>
+          <button onClick={() => runSearch(query, "next")} style={searchBtn} tabIndex={-1}>↓</button>
+          <button onClick={closeSearch} style={searchBtn} tabIndex={-1}>✕</button>
+        </div>
+      )}
+    </div>
   );
 }
+
+const searchBtn: React.CSSProperties = {
+  background: "var(--bg)",
+  border: "1px solid var(--border)",
+  borderRadius: 4,
+  color: "var(--text-muted)",
+  cursor: "pointer",
+  fontSize: 12,
+  width: 24,
+  height: 24,
+};

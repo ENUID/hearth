@@ -30,7 +30,13 @@ function getOrCreateSession(sid: string): Session {
     cols: 80,
     rows: 24,
     cwd: process.env.HOME ?? "/",
-    env: { ...process.env, TERM: "xterm-256color" } as Record<string, string>,
+    env: {
+      ...process.env,
+      TERM: "xterm-256color",
+      COLORTERM: "truecolor", // advertise 24-bit color to programs
+      LANG: process.env.LANG ?? "C.UTF-8", // UTF-8 locale for unicode handling
+      TERM_PROGRAM: "Hearth",
+    } as Record<string, string>,
   });
 
   const session: Session = {
