@@ -9,7 +9,7 @@
     "8080": { "label": "Hearth", "onAutoForward": "openBrowser" }
   },
   "postCreateCommand": "npm install && npm run install:all && npm run build",
-  "postStartCommand": "nohup bash -lc 'PORT=8080 HOME=$HOME node server/dist/index.js' > /tmp/hearth.log 2>&1 & disown; echo 'Hearth starting on :8080'",
+  "postStartCommand": "nohup bash -lc 'PORT=8080 HOME=$HOME node server/dist/index.js' > /tmp/hearth.log 2>&1 &",
   "customizations": {
     "vscode": {
       "extensions": ["dbaeumer.vscode-eslint"]
