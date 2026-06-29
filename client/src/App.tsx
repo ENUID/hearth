@@ -6,6 +6,7 @@ import MachinePanel from "./components/MachinePanel";
 import SettingsPanel from "./components/SettingsPanel";
 import ModelsPanel from "./components/ModelsPanel";
 import AgentsPanel from "./components/AgentsPanel";
+import Welcome from "./components/Welcome";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
 import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession } from "./lib/api";
@@ -212,6 +213,13 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [agentsOpen, setAgentsOpen] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(() => {
+    try { return !localStorage.getItem("hearth_onboarded"); } catch { return false; }
+  });
+  const closeWelcome = useCallback(() => {
+    setWelcomeOpen(false);
+    try { localStorage.setItem("hearth_onboarded", "1"); } catch { /* ignore */ }
+  }, []);
   const [wsMenu, setWsMenu] = useState(false);
   const cycleTheme = useCallback(() => {
     const order = ["system", "light", "dark"] as const;
@@ -236,6 +244,7 @@ export default function App() {
     { id: "models", title: "Run an open-source model", hint: "ai", run: () => setModelsOpen(true) },
     { id: "agents", title: "Install a CLI agent (Claude Code, Aider…)", hint: "ai", run: () => setAgentsOpen(true) },
     { id: "machine", title: "Machine: size, GPU, usage", hint: "machine", run: () => setMachineOpen(true) },
+    { id: "welcome", title: "Show welcome / quick start", hint: "app", run: () => setWelcomeOpen(true) },
     { id: "settings", title: "Settings", hint: "app", run: () => setSettingsOpen(true) },
     { id: "theme", title: `Theme: ${settings.theme} → next`, hint: "app", run: cycleTheme },
     { id: "upload", title: "Upload file…", hint: "files", run: () => fileInputRef.current?.click() },
@@ -348,6 +357,13 @@ export default function App() {
       {machineOpen && <MachinePanel ws={activeWs} onClose={() => setMachineOpen(false)} />}
       {settingsOpen && <SettingsPanel commands={commands} onClose={() => setSettingsOpen(false)} />}
       {paletteOpen && <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />}
+      {welcomeOpen && (
+        <Welcome
+          onClose={closeWelcome}
+          onOpenModels={() => setModelsOpen(true)}
+          onOpenAgents={() => setAgentsOpen(true)}
+        />
+      )}
     </div>
   );
 }
