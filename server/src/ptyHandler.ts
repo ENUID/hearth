@@ -46,6 +46,11 @@ function getOrCreateSession(sid: string): Session {
       COLORTERM: "truecolor", // advertise 24-bit color to programs
       LANG: process.env.LANG ?? "C.UTF-8", // UTF-8 locale for unicode handling
       TERM_PROGRAM: "Hearth",
+      // OpenAI-compatible base for the workspace's own model runner, so CLI
+      // agents (Aider, Codex, …) can target the free on-device/cloud model.
+      // Hearth-specific name on purpose — we don't override OPENAI_BASE_URL,
+      // which would silently hijack a user's real OpenAI key.
+      HEARTH_MODEL_URL: `http://localhost:${process.env.PORT ?? "3001"}/api/models/v1`,
     } as Record<string, string>,
   });
 

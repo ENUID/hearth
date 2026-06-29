@@ -126,3 +126,12 @@ export function modelChat(messages: { role: string; content: string }[], ws = "w
 }
 export const chargeNow = (): Promise<{ invoice: { totalCents: number }; result: { status: string; provider: string; amountCents: number } }> =>
   authedJson("/api/billing/charge", { method: "POST" });
+
+// --- CLI agent catalog ---
+export interface AgentInfo {
+  id: string; name: string; vendor: string; blurb: string;
+  install: string; run: string;
+  brain: "local" | "byok" | "both"; openSource: boolean; docs: string; localNote?: string;
+}
+export interface AgentsSnapshot { catalog: AgentInfo[]; localModelApi: string }
+export const getAgents = (): Promise<AgentsSnapshot> => authedJson("/api/agents");

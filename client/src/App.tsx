@@ -5,6 +5,7 @@ import Login from "./components/Login";
 import MachinePanel from "./components/MachinePanel";
 import SettingsPanel from "./components/SettingsPanel";
 import ModelsPanel from "./components/ModelsPanel";
+import AgentsPanel from "./components/AgentsPanel";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
 import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession } from "./lib/api";
@@ -210,6 +211,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
+  const [agentsOpen, setAgentsOpen] = useState(false);
   const [wsMenu, setWsMenu] = useState(false);
   const cycleTheme = useCallback(() => {
     const order = ["system", "light", "dark"] as const;
@@ -232,6 +234,7 @@ export default function App() {
     { id: "close-tab", title: "Close current tab", hint: "tabs", run: () => closeTab((tabsByWs[activeWs] ?? cur).active) },
     { id: "new-ws", title: "New workspace", hint: "workspace", run: newWorkspace },
     { id: "models", title: "Run an open-source model", hint: "ai", run: () => setModelsOpen(true) },
+    { id: "agents", title: "Install a CLI agent (Claude Code, Aider…)", hint: "ai", run: () => setAgentsOpen(true) },
     { id: "machine", title: "Machine: size, GPU, usage", hint: "machine", run: () => setMachineOpen(true) },
     { id: "settings", title: "Settings", hint: "app", run: () => setSettingsOpen(true) },
     { id: "theme", title: `Theme: ${settings.theme} → next`, hint: "app", run: cycleTheme },
@@ -302,6 +305,13 @@ export default function App() {
         >
           ✦ models
         </button>
+        <button
+          onClick={() => setAgentsOpen((o) => !o)}
+          title="install a CLI agent"
+          style={{ ...ghostBtn, color: agentsOpen ? "var(--fg)" : "var(--fg-muted)", background: agentsOpen ? "var(--accent-soft)" : "transparent" }}
+        >
+          ◆ agents
+        </button>
         <button onClick={() => setMachineOpen(true)} title="machine" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ color: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", fontSize: 8 }}>●</span>
           <span style={{ color: "var(--fg-muted)" }}>{machineState || "machine"}</span>
@@ -326,6 +336,12 @@ export default function App() {
           })}
         </div>
         {modelsOpen && <ModelsPanel ws={activeWs} onClose={() => setModelsOpen(false)} />}
+        {agentsOpen && (
+          <AgentsPanel
+            onRun={(cmd) => { sendToActive(cmd); setAgentsOpen(false); }}
+            onClose={() => setAgentsOpen(false)}
+          />
+        )}
       </div>
 
       {showKeyBar && <KeyBar onSend={sendToActive} mods={mods} onToggleCtrl={toggleCtrl} onToggleAlt={toggleAlt} />}

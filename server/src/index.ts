@@ -9,6 +9,7 @@ import { handleDownload, handleUpload } from "./files";
 import { authEnabled, checkPassword, issueToken, isAuthorized } from "./auth";
 import { mountControlPlane } from "./controlplane/routes";
 import { mountModels } from "./models/routes";
+import { mountAgents } from "./agents/routes";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 
@@ -65,6 +66,9 @@ mountControlPlane(app, (req) => isAuthorized(req, reqUrl(req)));
 
 // One-click open-model runner: catalog → run (provision GPU + serve) → chat + API.
 mountModels(app, (req) => isAuthorized(req, reqUrl(req)));
+
+// One-tap CLI agent catalog (Claude Code, Aider, Codex, …) installed into the terminal.
+mountAgents(app, (req) => isAuthorized(req, reqUrl(req)));
 
 // Serve the built client so a single port serves the whole app (production /
 // single-origin). In dev you use the Vite server on :5173 instead.

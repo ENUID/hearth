@@ -1,0 +1,96 @@
+import { useEffect, useState } from "react";
+import { getAgents, type AgentInfo, type AgentsSnapshot } from "../lib/api";
+
+// Prefix that points an OpenAI-compatible agent at the workspace's own model
+// runner (the free on-device/cloud model). $HEARTH_MODEL_URL is exported into
+// every terminal by the bridge; both env names are used by tools in the wild.
+const FREE_PREFIX =
+  'OPENAI_BASE_URL="$HEARTH_MODEL_URL" OPENAI_API_BASE="$HEARTH_MODEL_URL" OPENAI_API_KEY="${HEARTH_MODEL_KEY:-hearth}" ';
+
+const brainLabel: Record<AgentInfo["brain"], string> = {
+  local: "free model",
+  byok: "your key",
+  both: "free model · your key",
+};
+
+export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) => void; onClose: () => void }) {
+  const [snap, setSnap] = useState<AgentsSnapshot | null>(null);
+  const [msg, setMsg] = useState("");
+  const [done, setDone] = useState<Record<string, "installing" | "done">>({});
+
+  useEffect(() => {
+    getAgents().then(setSnap).catch((e) => setMsg((e as Error).message));
+  }, []);
+
+  function run(cmd: string) {
+    onRun(cmd + "\n");
+  }
+  function install(a: AgentInfo) {
+    run(a.install);
+    setDone((d) => ({ ...d, [a.id]: "done" }));
+    setMsg(`installing ${a.name} in your terminal…`);
+  }
+
+  return (
+    <div style={panel}>
+      <div style={headerBar}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg)" }}>agents</span>
+        <span style={{ fontSize: 10, color: "var(--fg-subtle)", marginLeft: 8 }}>CLI agents, one tap</span>
+        <button onClick={onClose} style={closeBtn} tabIndex={-1}>✕</button>
+      </div>
+
+      {!snap ? (
+        <div style={{ padding: 14, color: "var(--fg-muted)" }}>loading…</div>
+      ) : (
+        <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 2 }}>
+            Install an agent into this workspace's terminal. Open-source ones can run on your{" "}
+            <b>free Hearth model</b>; others use your own provider key.
+          </div>
+          {snap.catalog.map((a) => {
+            const canFree = a.brain !== "byok";
+            return (
+              <div key={a.id} style={card}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 600, color: "var(--fg)" }}>{a.name}</span>
+                  <span style={{ fontSize: 10, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>{a.vendor}</span>
+                  {a.openSource && <span style={badge}>open source</span>}
+                  <span style={badge}>{brainLabel[a.brain]}</span>
+                </div>
+                <div style={{ fontSize: 12, color: "var(--fg-muted)", margin: "4px 0 6px" }}>{a.blurb}</div>
+                <code style={cmdLine}>{a.install}</code>
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <button onClick={() => install(a)} style={runBtn}>
+                    {done[a.id] === "done" ? "Install again" : "Install"}
+                  </button>
+                  {canFree ? (
+                    <button onClick={() => run(FREE_PREFIX + a.run)} style={secondaryBtn} title="run pointed at your free Hearth model">
+                      Run · free model
+                    </button>
+                  ) : (
+                    <button onClick={() => run(a.run)} style={secondaryBtn}>Run</button>
+                  )}
+                </div>
+                {a.localNote && <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 6 }}>{a.localNote}</div>}
+              </div>
+            );
+          })}
+          {msg && <div style={{ fontSize: 12, color: "var(--accent)", padding: "4px 2px" }}>{msg}</div>}
+          <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 4, lineHeight: 1.5 }}>
+            "Run · free model" needs a model running (open the <b>models</b> panel first). Commands are
+            typed into your active terminal — it's your machine.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const panel: React.CSSProperties = { width: 380, maxWidth: "94vw", flexShrink: 0, display: "flex", flexDirection: "column", borderLeft: "1px solid var(--border)", background: "var(--bg-elevated)", minHeight: 0 };
+const headerBar: React.CSSProperties = { display: "flex", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid var(--border)" };
+const closeBtn: React.CSSProperties = { marginLeft: "auto", background: "transparent", border: "none", color: "var(--fg-muted)", cursor: "pointer", fontSize: 14 };
+const card: React.CSSProperties = { border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "10px 12px", background: "var(--bg)" };
+const badge: React.CSSProperties = { fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--fg-muted)", border: "1px solid var(--border-strong)", borderRadius: 4, padding: "1px 5px" };
+const cmdLine: React.CSSProperties = { display: "block", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-muted)", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "5px 7px", wordBreak: "break-all" };
+const runBtn: React.CSSProperties = { flex: 1, background: "var(--accent)", color: "var(--bg)", border: "none", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
+const secondaryBtn: React.CSSProperties = { flex: 1, background: "transparent", color: "var(--fg)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
