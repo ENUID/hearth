@@ -18,6 +18,8 @@ export interface AgentInfo {
   install: string;
   /** Command that launches it once installed. */
   run: string;
+  /** Executable name, used to detect whether it's installed (`which <bin>`). */
+  bin: string;
   brain: AgentBrain;
   openSource: boolean;
   docs: string;
@@ -33,6 +35,7 @@ export const AGENT_CATALOG: AgentInfo[] = [
     blurb: "Anthropic's official terminal agent. Best-in-class coding.",
     install: "npm install -g @anthropic-ai/claude-code",
     run: "claude",
+    bin: "claude",
     brain: "byok",
     openSource: false,
     docs: "https://docs.claude.com/en/docs/claude-code",
@@ -45,6 +48,7 @@ export const AGENT_CATALOG: AgentInfo[] = [
     blurb: "Open-source terminal agent. Works with any OpenAI-compatible model.",
     install: "npm install -g opencode-ai",
     run: "opencode",
+    bin: "opencode",
     brain: "both",
     openSource: true,
     docs: "https://opencode.ai",
@@ -57,6 +61,7 @@ export const AGENT_CATALOG: AgentInfo[] = [
     blurb: "Pair-programming in your terminal. Edits files via git.",
     install: "python3 -m pip install -U aider-chat",
     run: "aider",
+    bin: "aider",
     brain: "both",
     openSource: true,
     docs: "https://aider.chat",
@@ -69,6 +74,7 @@ export const AGENT_CATALOG: AgentInfo[] = [
     blurb: "OpenAI's open-source terminal coding agent.",
     install: "npm install -g @openai/codex",
     run: "codex",
+    bin: "codex",
     brain: "both",
     openSource: true,
     docs: "https://github.com/openai/codex",
@@ -81,6 +87,7 @@ export const AGENT_CATALOG: AgentInfo[] = [
     blurb: "Google's open-source terminal agent for Gemini models.",
     install: "npm install -g @google/gemini-cli",
     run: "gemini",
+    bin: "gemini",
     brain: "byok",
     openSource: true,
     docs: "https://github.com/google-gemini/gemini-cli",
@@ -93,6 +100,7 @@ export const AGENT_CATALOG: AgentInfo[] = [
     blurb: "Open-source agent that runs tasks, not just chat.",
     install: "curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash",
     run: "goose session",
+    bin: "goose",
     brain: "both",
     openSource: true,
     docs: "https://block.github.io/goose",

@@ -130,8 +130,9 @@ export const chargeNow = (): Promise<{ invoice: { totalCents: number }; result: 
 // --- CLI agent catalog ---
 export interface AgentInfo {
   id: string; name: string; vendor: string; blurb: string;
-  install: string; run: string;
+  install: string; run: string; bin: string;
   brain: "local" | "byok" | "both"; openSource: boolean; docs: string; localNote?: string;
 }
 export interface AgentsSnapshot { catalog: AgentInfo[]; localModelApi: string }
 export const getAgents = (): Promise<AgentsSnapshot> => authedJson("/api/agents");
+export const getAgentStatus = (): Promise<{ installed: Record<string, boolean> }> => authedJson("/api/agents/status");

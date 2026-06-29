@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { getAgents, type AgentInfo, type AgentsSnapshot } from "../lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { getAgents, getAgentStatus, type AgentInfo, type AgentsSnapshot } from "../lib/api";
 
 // Prefix that points an OpenAI-compatible agent at the workspace's own model
 // runner (the free on-device/cloud model). $HEARTH_MODEL_URL is exported into
@@ -16,18 +16,25 @@ const brainLabel: Record<AgentInfo["brain"], string> = {
 export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) => void; onClose: () => void }) {
   const [snap, setSnap] = useState<AgentsSnapshot | null>(null);
   const [msg, setMsg] = useState("");
-  const [done, setDone] = useState<Record<string, "installing" | "done">>({});
+  const [installed, setInstalled] = useState<Record<string, boolean>>({});
+
+  const refreshStatus = useCallback(() => {
+    getAgentStatus().then((s) => setInstalled(s.installed)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     getAgents().then(setSnap).catch((e) => setMsg((e as Error).message));
-  }, []);
+    refreshStatus();
+    // Re-probe periodically so a finished install flips the badge to "installed".
+    const t = setInterval(refreshStatus, 5000);
+    return () => clearInterval(t);
+  }, [refreshStatus]);
 
   function run(cmd: string) {
     onRun(cmd + "\n");
   }
   function install(a: AgentInfo) {
     run(a.install);
-    setDone((d) => ({ ...d, [a.id]: "done" }));
     setMsg(`installing ${a.name} in your terminal…`);
   }
 
@@ -49,6 +56,7 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
           </div>
           {snap.catalog.map((a) => {
             const canFree = a.brain !== "byok";
+            const isIn = installed[a.id];
             return (
               <div key={a.id} style={card}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
@@ -56,19 +64,28 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
                   <span style={{ fontSize: 10, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>{a.vendor}</span>
                   {a.openSource && <span style={badge}>open source</span>}
                   <span style={badge}>{brainLabel[a.brain]}</span>
+                  {isIn && <span style={{ ...badge, color: "var(--ok, #3fb950)", borderColor: "var(--ok, #3fb950)" }}>installed ✓</span>}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--fg-muted)", margin: "4px 0 6px" }}>{a.blurb}</div>
-                <code style={cmdLine}>{a.install}</code>
+                {!isIn && <code style={cmdLine}>{a.install}</code>}
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                  <button onClick={() => install(a)} style={runBtn}>
-                    {done[a.id] === "done" ? "Install again" : "Install"}
-                  </button>
-                  {canFree ? (
-                    <button onClick={() => run(FREE_PREFIX + a.run)} style={secondaryBtn} title="run pointed at your free Hearth model">
-                      Run · free model
-                    </button>
+                  {isIn ? (
+                    canFree ? (
+                      <button onClick={() => run(FREE_PREFIX + a.run)} style={runBtn} title="run pointed at your free Hearth model">
+                        Run · free model
+                      </button>
+                    ) : (
+                      <button onClick={() => run(a.run)} style={runBtn}>Run</button>
+                    )
                   ) : (
-                    <button onClick={() => run(a.run)} style={secondaryBtn}>Run</button>
+                    <>
+                      <button onClick={() => install(a)} style={runBtn}>Install</button>
+                      {canFree && (
+                        <button onClick={() => run(FREE_PREFIX + a.run)} style={secondaryBtn} title="run pointed at your free Hearth model">
+                          Run · free model
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
                 {a.localNote && <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 6 }}>{a.localNote}</div>}
