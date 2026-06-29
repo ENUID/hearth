@@ -49,6 +49,7 @@ export default function KeyBar({ onSend, mods, onToggleCtrl, onToggleAlt }: Prop
         display: "flex",
         gap: 6,
         padding: "6px 8px",
+        paddingBottom: "calc(6px + env(safe-area-inset-bottom))",
         overflowX: "auto",
         background: "var(--bg-elevated)",
         borderTop: "1px solid var(--border)",

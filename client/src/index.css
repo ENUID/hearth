@@ -47,8 +47,10 @@
 
 html, body, #root {
   height: 100%;
+  height: 100dvh; /* fill the dynamic viewport (no gap from mobile browser chrome) */
   width: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);

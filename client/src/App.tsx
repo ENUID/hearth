@@ -150,17 +150,23 @@ export default function App() {
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv || !showKeyBar) return;
+    if (!vv) return;
+    // Only pin the height while the on-screen keyboard is open (so the key bar
+    // stays visible). Otherwise let CSS 100dvh fill the screen — no bottom gap.
     const onVV = () => {
-      if (rootRef.current) rootRef.current.style.height = `${vv.height}px`;
+      if (!rootRef.current) return;
+      const keyboardOpen = window.innerHeight - vv.height > 80;
+      rootRef.current.style.height = keyboardOpen ? `${vv.height}px` : "";
     };
     vv.addEventListener("resize", onVV);
+    vv.addEventListener("scroll", onVV);
     onVV();
     return () => {
       vv.removeEventListener("resize", onVV);
+      vv.removeEventListener("scroll", onVV);
       if (rootRef.current) rootRef.current.style.height = "";
     };
-  }, [showKeyBar]);
+  }, []);
 
   // --- machine status (per active workspace) ---
   const [machineOpen, setMachineOpen] = useState(false);
@@ -236,7 +242,7 @@ export default function App() {
   const activeWsName = workspaces.find((w) => w.id === activeWs)?.name ?? activeWs;
 
   return (
-    <div ref={rootRef} style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+    <div ref={rootRef} style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <div style={headerStyle}>
         <span style={{ fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em", fontFamily: "var(--font-mono)", fontSize: 13 }}>hearth</span>
 
