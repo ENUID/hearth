@@ -249,8 +249,21 @@ fallback. API: `GET /api/machine`, `POST /api/machine/{resize,wake,sleep,gpu}`,
 - [x] Multiple workspaces: each workspace is its own machine + tabs + persistent
       home, switchable in the UI. Sessions are namespaced `<workspace>__<tab>`;
       the control plane keys a machine per workspace; billing aggregates across them.
+- [x] One-click open-model runner: catalog → run (provision GPU + serve) →
+      chat + OpenAI-compatible endpoint. Backends: stub (default, verified) and
+      ollama; ties into the GPU control plane and metering.
 - [ ] Multi-user accounts and teams (shared workspaces, roles)
 - [ ] Self-host packaging polish (one-command deploy, org settings)
+
+#### 11.2 Open-model runner (the open-AI front door)
+
+A thin layer above the terminal that makes Hearth the place to *use* open models:
+a curated **catalog** (`models/catalog.ts`), a **runner** (`StubRunner` /
+`OllamaRunner`), and a per-workspace **model manager**. Running a model
+provisions its GPU via the control plane (CPU models skip the GPU), serves it,
+and exposes `POST /api/models/v1/chat/completions` — an OpenAI-compatible
+endpoint clients can point any tool at (token = API key). Stop releases the GPU.
+This is the monetizable wedge: people pay for the GPU minutes the model uses.
 
 ---
 

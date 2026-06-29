@@ -4,6 +4,7 @@ import KeyBar from "./components/KeyBar";
 import Login from "./components/Login";
 import MachinePanel from "./components/MachinePanel";
 import SettingsPanel from "./components/SettingsPanel";
+import ModelsPanel from "./components/ModelsPanel";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
 import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession } from "./lib/api";
@@ -208,6 +209,7 @@ export default function App() {
   // --- palette / panels ---
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [modelsOpen, setModelsOpen] = useState(false);
   const [wsMenu, setWsMenu] = useState(false);
   const cycleTheme = useCallback(() => {
     const order = ["system", "light", "dark"] as const;
@@ -229,6 +231,7 @@ export default function App() {
     { id: "new-tab", title: "New tab", hint: "tabs", run: newTab },
     { id: "close-tab", title: "Close current tab", hint: "tabs", run: () => closeTab((tabsByWs[activeWs] ?? cur).active) },
     { id: "new-ws", title: "New workspace", hint: "workspace", run: newWorkspace },
+    { id: "models", title: "Run an open-source model", hint: "ai", run: () => setModelsOpen(true) },
     { id: "machine", title: "Machine: size, GPU, usage", hint: "machine", run: () => setMachineOpen(true) },
     { id: "settings", title: "Settings", hint: "app", run: () => setSettingsOpen(true) },
     { id: "theme", title: `Theme: ${settings.theme} → next`, hint: "app", run: cycleTheme },
@@ -292,6 +295,13 @@ export default function App() {
         </div>
 
         {status && <span style={{ color: "var(--fg-muted)", fontSize: 11, marginRight: 8 }}>{status}</span>}
+        <button
+          onClick={() => setModelsOpen((o) => !o)}
+          title="run an open-source model"
+          style={{ ...ghostBtn, color: modelsOpen ? "var(--fg)" : "var(--fg-muted)", background: modelsOpen ? "var(--accent-soft)" : "transparent" }}
+        >
+          ✦ models
+        </button>
         <button onClick={() => setMachineOpen(true)} title="machine" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ color: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", fontSize: 8 }}>●</span>
           <span style={{ color: "var(--fg-muted)" }}>{machineState || "machine"}</span>
@@ -303,16 +313,19 @@ export default function App() {
         <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { if (e.target.files?.length) uploadFiles(e.target.files); e.target.value = ""; }} />
       </div>
 
-      {/* terminals for the active workspace */}
-      <div
-        style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 0 }}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); if (e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files); }}
-      >
-        {cur.tabs.map((t) => {
-          const sid = `${activeWs}__${t.id}`;
-          return <TerminalTab key={sid} sid={sid} active={t.id === cur.active} modifiersRef={modifiersRef} onConsumeModifiers={clearMods} register={register} />;
-        })}
+      {/* terminals (+ optional models panel) for the active workspace */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
+        <div
+          style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 0 }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); if (e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files); }}
+        >
+          {cur.tabs.map((t) => {
+            const sid = `${activeWs}__${t.id}`;
+            return <TerminalTab key={sid} sid={sid} active={t.id === cur.active} modifiersRef={modifiersRef} onConsumeModifiers={clearMods} register={register} />;
+          })}
+        </div>
+        {modelsOpen && <ModelsPanel ws={activeWs} onClose={() => setModelsOpen(false)} />}
       </div>
 
       {showKeyBar && <KeyBar onSend={sendToActive} mods={mods} onToggleCtrl={toggleCtrl} onToggleAlt={toggleAlt} />}

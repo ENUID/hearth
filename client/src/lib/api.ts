@@ -100,5 +100,28 @@ export const releaseGpu = (ws = "workspace"): Promise<MachineSnapshot> => authed
 export const sleepMachine = (ws = "workspace"): Promise<MachineSnapshot> => authedJson("/api/machine/sleep", { method: "POST", body: { ws } });
 export const wakeMachine = (ws = "workspace"): Promise<MachineSnapshot> => authedJson("/api/machine/wake", { method: "POST", body: { ws } });
 export const getWorkspaces = (): Promise<{ workspaces: { id: string; state: string; tier: string }[] }> => authedJson("/api/workspaces");
+
+// --- open-model runner ---
+export interface ModelInfo {
+  id: string; name: string; params: string; family: string; gpu: "cpu" | "a10g" | "a100"; sizeGb: number; blurb: string;
+}
+export interface RunningModel {
+  workspace: string; modelId: string; name: string; status: string; startedAt: number; gpu: string | null; error?: string;
+}
+export interface ModelsSnapshot {
+  catalog: ModelInfo[]; running: RunningModel | null; backend: string; apiPath: string;
+}
+export const getModels = (ws = "workspace"): Promise<ModelsSnapshot> => authedJson(`/api/models?ws=${W(ws)}`);
+export const startModel = (modelId: string, ws = "workspace"): Promise<{ running: RunningModel }> => authedJson("/api/models/start", { method: "POST", body: { modelId, ws } });
+export const stopModel = (ws = "workspace"): Promise<{ running: RunningModel | null }> => authedJson("/api/models/stop", { method: "POST", body: { ws } });
+
+/** Streaming OpenAI-compatible chat against the workspace's running model. */
+export function modelChat(messages: { role: string; content: string }[], ws = "workspace"): Promise<Response> {
+  return fetch("/api/models/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ ws, messages, stream: true }),
+  });
+}
 export const chargeNow = (): Promise<{ invoice: { totalCents: number }; result: { status: string; provider: string; amountCents: number } }> =>
   authedJson("/api/billing/charge", { method: "POST" });

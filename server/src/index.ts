@@ -8,6 +8,7 @@ import { handlePtyConnection, killSession } from "./ptyHandler";
 import { handleDownload, handleUpload } from "./files";
 import { authEnabled, checkPassword, issueToken, isAuthorized } from "./auth";
 import { mountControlPlane } from "./controlplane/routes";
+import { mountModels } from "./models/routes";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 
@@ -61,6 +62,9 @@ app.post("/api/session/kill", (req, res) => {
 
 // Phase 2 control plane: machine sizing, scale-to-zero, GPU, metering, billing.
 mountControlPlane(app, (req) => isAuthorized(req, reqUrl(req)));
+
+// One-click open-model runner: catalog → run (provision GPU + serve) → chat + API.
+mountModels(app, (req) => isAuthorized(req, reqUrl(req)));
 
 // Serve the built client so a single port serves the whole app (production /
 // single-origin). In dev you use the Vite server on :5173 instead.

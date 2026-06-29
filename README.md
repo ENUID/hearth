@@ -37,6 +37,8 @@ Hearth gives you the computer and the terminal. What runs on it is entirely your
 
 ## Features
 
+- **Run open-source models in one tap** — pick a model (Llama, Qwen, Mistral, Gemma, DeepSeek…); Hearth rents the GPU, serves it, and gives you a **chat UI + an OpenAI-compatible API endpoint**. The terminal is the power layer underneath.
+
 A complete terminal, not a demo:
 
 - **Full terminal emulation** — 24-bit truecolor, Unicode/emoji/CJK, full-screen TUIs (vim, htop, less), mouse, job control (Ctrl-C/Z/D), 10k scrollback, clickable links, bell.
