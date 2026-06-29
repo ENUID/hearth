@@ -173,6 +173,10 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
             );
           })}
           {msg && <div style={{ fontSize: 12, color: "var(--accent)", padding: "4px 2px" }}>{msg}</div>}
+          <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 4, lineHeight: 1.5 }}>
+            These are a curated few. Want another? It's your machine — pull any Ollama or
+            Hugging Face model in the terminal and serve it yourself.
+          </div>
         </div>
       ) : (
         <>

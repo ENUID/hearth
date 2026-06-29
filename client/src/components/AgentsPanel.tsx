@@ -94,8 +94,9 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
           })}
           {msg && <div style={{ fontSize: 12, color: "var(--accent)", padding: "4px 2px" }}>{msg}</div>}
           <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 4, lineHeight: 1.5 }}>
-            "Run · free model" needs a model running (open the <b>models</b> panel first). Commands are
-            typed into your active terminal — it's your machine.
+            A curated few. Don't see your tool? It's a real terminal — install anything
+            (npm, pip, brew, curl) and run it. "Run · free model" needs a model running
+            (open the <b>models</b> panel first).
           </div>
         </div>
       )}

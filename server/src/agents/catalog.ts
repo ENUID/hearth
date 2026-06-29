@@ -106,6 +106,32 @@ export const AGENT_CATALOG: AgentInfo[] = [
     docs: "https://block.github.io/goose",
     localNote: "Configure an OpenAI-compatible provider pointed at your model.",
   },
+  {
+    id: "open-interpreter",
+    name: "Open Interpreter",
+    vendor: "Open Interpreter",
+    blurb: "Runs code on your machine to complete tasks from plain English.",
+    install: "python3 -m pip install -U open-interpreter",
+    run: "interpreter",
+    bin: "interpreter",
+    brain: "both",
+    openSource: true,
+    docs: "https://docs.openinterpreter.com",
+    localNote: "Point it at your free Hearth model with --api_base, or use a key.",
+  },
+  {
+    id: "openhands",
+    name: "OpenHands",
+    vendor: "All Hands AI",
+    blurb: "Autonomous agent that writes code, runs commands, browses.",
+    install: "python3 -m pip install -U openhands-ai",
+    run: "openhands",
+    bin: "openhands",
+    brain: "both",
+    openSource: true,
+    docs: "https://docs.all-hands.dev",
+    localNote: "Configure an OpenAI-compatible LLM pointed at your model.",
+  },
 ];
 
 export function findAgent(id: string): AgentInfo | undefined {

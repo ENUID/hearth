@@ -27,6 +27,7 @@ export const MODEL_CATALOG: ModelInfo[] = [
   { id: "mistral:7b", name: "Mistral 7B", params: "7B", family: "Mistral", gpu: "a10g", sizeGb: 4.1, blurb: "Fast, capable, popular open model.", localTier: "heavy", mlcId: "Mistral-7B-Instruct-v0.3-q4f16_1-MLC" },
   { id: "gemma2:9b", name: "Gemma 2 9B", params: "9B", family: "Google Gemma", gpu: "a10g", sizeGb: 5.4, blurb: "Google's open model, solid all-rounder.", localTier: "heavy", mlcId: "gemma-2-9b-it-q4f16_1-MLC" },
   { id: "deepseek-r1:8b", name: "DeepSeek-R1 8B", params: "8B", family: "DeepSeek", gpu: "a10g", sizeGb: 4.9, blurb: "Reasoning model that thinks step by step.", localTier: "heavy", mlcId: "DeepSeek-R1-Distill-Llama-8B-q4f16_1-MLC" },
+  { id: "hermes3:8b", name: "Hermes 3 8B", params: "8B", family: "Nous Research", gpu: "a10g", sizeGb: 4.7, blurb: "Steerable, candid assistant fine-tune of Llama 3.1.", localTier: "heavy", mlcId: "Hermes-3-Llama-3.1-8B-q4f16_1-MLC" },
   { id: "llama3.1:70b", name: "Llama 3.1 70B", params: "70B", family: "Meta Llama", gpu: "a100", sizeGb: 40, blurb: "Frontier-class open model. Needs a big GPU.", localTier: "none" },
 ];
 
