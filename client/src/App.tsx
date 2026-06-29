@@ -9,7 +9,7 @@ import AgentsPanel from "./components/AgentsPanel";
 import Welcome from "./components/Welcome";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
-import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession } from "./lib/api";
+import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession, getMe, logout } from "./lib/api";
 import { useSettings, setSettings } from "./lib/settings";
 
 type Mods = { ctrl: boolean; alt: boolean };
@@ -40,8 +40,25 @@ export default function App() {
   // --- auth ---
   const [authResolved, setAuthResolved] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
+  const [multiUser, setMultiUser] = useState(false);
+  const [me, setMe] = useState<string | null>(null);
   useEffect(() => {
-    getConfig().then((c) => setNeedsLogin(c.authRequired && !getToken())).catch(() => {}).finally(() => setAuthResolved(true));
+    getConfig()
+      .then((c) => {
+        setMultiUser(c.multiUser);
+        setNeedsLogin(c.authRequired && !getToken());
+        if (c.multiUser && getToken()) getMe().then((m) => setMe(m.user?.username ?? null)).catch(() => {});
+      })
+      .catch(() => {})
+      .finally(() => setAuthResolved(true));
+  }, []);
+  const onAuthed = useCallback(() => {
+    setNeedsLogin(false);
+    getMe().then((m) => setMe(m.user?.username ?? null)).catch(() => {});
+  }, []);
+  const signOut = useCallback(() => {
+    logout();
+    window.location.reload();
   }, []);
 
   // --- workspaces (Phase 3) ---
@@ -252,7 +269,7 @@ export default function App() {
   ];
 
   if (!authResolved) return null;
-  if (needsLogin) return <Login onAuthed={() => setNeedsLogin(false)} />;
+  if (needsLogin) return <Login onAuthed={onAuthed} multiUser={multiUser} />;
 
   const activeWsName = workspaces.find((w) => w.id === activeWs)?.name ?? activeWs;
 
@@ -328,6 +345,12 @@ export default function App() {
         <button onClick={() => setSettingsOpen(true)} title="settings" style={{ ...ghostBtn, display: "flex", alignItems: "center", padding: "4px 6px" }} aria-label="settings">
           <GearIcon />
         </button>
+        {multiUser && me && (
+          <button onClick={signOut} title={`signed in as ${me} — sign out`} style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 18, height: 18, borderRadius: 999, background: "var(--accent-soft)", color: "var(--fg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{me.slice(0, 1)}</span>
+            <span style={{ color: "var(--fg-muted)" }}>sign out</span>
+          </button>
+        )}
 
         <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { if (e.target.files?.length) uploadFiles(e.target.files); e.target.value = ""; }} />
       </div>

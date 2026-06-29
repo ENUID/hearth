@@ -6,7 +6,8 @@ import { WebSocketServer } from "ws";
 import { URL } from "url";
 import { handlePtyConnection, killSession } from "./ptyHandler";
 import { handleDownload, handleUpload } from "./files";
-import { authEnabled, checkPassword, issueToken, isAuthorized } from "./auth";
+import { authEnabled, checkPassword, issueToken, isAuthorized, scopeId, decodeToken, tokenFromRequest } from "./auth";
+import { multiUserEnabled, createUser, verifyUser, getUser } from "./accounts";
 import { mountControlPlane } from "./controlplane/routes";
 import { mountModels } from "./models/routes";
 import { mountAgents } from "./agents/routes";
@@ -20,13 +21,34 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, ts: Date.now() });
 });
 
-// Tells the client whether it must authenticate.
+// Tells the client whether it must authenticate, and which mode.
 app.get("/api/config", (_req, res) => {
-  res.json({ authRequired: authEnabled });
+  res.json({ authRequired: authEnabled, multiUser: multiUserEnabled });
 });
 
-// Exchange a password for a token (only meaningful when auth is enabled).
+// Create an account (multi-user mode only).
+app.post("/api/signup", (req, res) => {
+  if (!multiUserEnabled) {
+    res.status(404).json({ error: "signups are disabled" });
+    return;
+  }
+  try {
+    const user = createUser(String(req.body?.username ?? ""), String(req.body?.password ?? ""));
+    res.json({ token: issueToken(user.id), username: user.username });
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+// Exchange credentials for a token. Multi-user → username+password; single
+// tenant → the shared password.
 app.post("/api/login", (req, res) => {
+  if (multiUserEnabled) {
+    const user = verifyUser(String(req.body?.username ?? ""), String(req.body?.password ?? ""));
+    if (user) res.json({ token: issueToken(user.id), username: user.username });
+    else res.status(401).json({ error: "invalid username or password" });
+    return;
+  }
   if (!authEnabled) {
     res.json({ token: null, authRequired: false });
     return;
@@ -37,6 +59,17 @@ app.post("/api/login", (req, res) => {
   } else {
     res.status(401).json({ error: "invalid password" });
   }
+});
+
+// Who am I (multi-user). Returns null when not signed in / single-tenant.
+app.get("/api/me", (req, res) => {
+  if (!multiUserEnabled) {
+    res.json({ user: null });
+    return;
+  }
+  const decoded = decodeToken(tokenFromRequest(req, reqUrl(req)));
+  const user = decoded ? getUser(decoded.sub) : null;
+  res.json({ user: user ? { username: user.username } : null });
 });
 
 // Auth check that also accepts a `?token=` query param (browser download links
@@ -57,7 +90,7 @@ app.post("/api/session/kill", (req, res) => {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  killSession(String(req.query.sid ?? ""));
+  killSession(scopeId(req, reqUrl(req), String(req.query.sid ?? "")));
   res.json({ ok: true });
 });
 
@@ -87,7 +120,6 @@ const wss = new WebSocketServer({ noServer: true });
 
 httpServer.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url ?? "/", "http://localhost");
-  const sid = url.searchParams.get("sid") ?? "default";
 
   if (url.pathname !== "/pty") {
     socket.destroy();
@@ -98,6 +130,8 @@ httpServer.on("upgrade", (req, socket, head) => {
     socket.destroy();
     return;
   }
+  // Namespace the session per user so two accounts never share a terminal.
+  const sid = scopeId(req, url, url.searchParams.get("sid") ?? "default");
   wss.handleUpgrade(req, socket, head, (ws) => {
     handlePtyConnection(ws, sid);
   });

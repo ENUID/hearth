@@ -28,20 +28,40 @@ export function tokenParam(): string {
   return t ? `&token=${encodeURIComponent(t)}` : "";
 }
 
-export async function getConfig(): Promise<{ authRequired: boolean }> {
+export async function getConfig(): Promise<{ authRequired: boolean; multiUser: boolean }> {
   const r = await fetch("/api/config");
   return r.json();
 }
 
-export async function login(password: string): Promise<void> {
+export async function login(password: string, username?: string): Promise<void> {
   const r = await fetch("/api/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ password, username }),
   });
-  if (!r.ok) throw new Error("Invalid password");
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Invalid credentials");
   const j = (await r.json()) as { token?: string };
   if (j.token) setToken(j.token);
+}
+
+export async function signup(username: string, password: string): Promise<void> {
+  const r = await fetch("/api/signup", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Sign up failed");
+  const j = (await r.json()) as { token?: string };
+  if (j.token) setToken(j.token);
+}
+
+export async function getMe(): Promise<{ user: { username: string } | null }> {
+  const r = await fetch("/api/me", { headers: authHeaders() });
+  return r.json();
+}
+
+export function logout(): void {
+  setToken(null);
 }
 
 export async function uploadFile(sid: string, file: File): Promise<{ ok?: boolean; path?: string; error?: string }> {

@@ -1,8 +1,10 @@
 import { useState, FormEvent } from "react";
-import { login } from "../lib/api";
+import { login, signup } from "../lib/api";
 
-export default function Login({ onAuthed }: { onAuthed: () => void }) {
+export default function Login({ onAuthed, multiUser }: { onAuthed: () => void; multiUser: boolean }) {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -11,78 +13,75 @@ export default function Login({ onAuthed }: { onAuthed: () => void }) {
     setBusy(true);
     setError("");
     try {
-      await login(password);
+      if (multiUser) {
+        if (creating) await signup(username, password);
+        else await login(password, username);
+      } else {
+        await login(password);
+      }
       onAuthed();
-    } catch {
-      setError("Invalid password");
+    } catch (err) {
+      setError((err as Error).message || "Failed");
       setBusy(false);
     }
   }
 
+  const canSubmit = multiUser ? username.length >= 2 && password.length >= 6 : password.length > 0;
+
   return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--bg)",
-      }}
-    >
-      <form
-        onSubmit={submit}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          width: 280,
-          padding: 24,
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-        }}
-      >
-        <div style={{ fontWeight: 700, color: "var(--fg)", fontFamily: "var(--font-mono)", fontSize: 20, letterSpacing: "-0.02em" }}>
-          hearth
-        </div>
+    <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12, width: 300, padding: 24, background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10 }}>
+        <div style={{ fontWeight: 700, color: "var(--fg)", fontFamily: "var(--font-mono)", fontSize: 20, letterSpacing: "-0.02em" }}>hearth</div>
         <div style={{ color: "var(--fg-subtle)", fontSize: 12, marginTop: -6, marginBottom: 4 }}>
-          your computer, in the browser
+          {multiUser ? (creating ? "create your account" : "sign in to your computer") : "your computer, in the browser"}
         </div>
+
+        {multiUser && (
+          <input
+            autoFocus
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            style={field}
+          />
+        )}
         <input
           type="password"
-          autoFocus
+          autoFocus={!multiUser}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="password"
-          style={{
-            background: "var(--bg)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            color: "var(--fg)",
-            padding: "10px 12px",
-            fontSize: 14,
-            outline: "none",
-          }}
+          placeholder={multiUser && creating ? "password (6+ characters)" : "password"}
+          style={field}
         />
+
         {error && <div style={{ color: "var(--danger)", fontSize: 12 }}>{error}</div>}
-        <button
-          type="submit"
-          disabled={busy || !password}
-          style={{
-            background: "var(--accent)",
-            color: "var(--bg)",
-            border: "none",
-            borderRadius: "var(--radius)",
-            padding: "10px",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            opacity: busy || !password ? 0.5 : 1,
-          }}
-        >
-          {busy ? "…" : "Enter"}
+
+        <button type="submit" disabled={busy || !canSubmit} style={{ ...primary, opacity: busy || !canSubmit ? 0.5 : 1 }}>
+          {busy ? "…" : multiUser ? (creating ? "Create account" : "Sign in") : "Enter"}
         </button>
+
+        {multiUser && (
+          <button
+            type="button"
+            onClick={() => { setCreating((c) => !c); setError(""); }}
+            style={{ background: "transparent", border: "none", color: "var(--fg-muted)", fontSize: 12, cursor: "pointer", padding: 0 }}
+          >
+            {creating ? "Have an account? Sign in" : "New here? Create an account"}
+          </button>
+        )}
       </form>
     </div>
   );
 }
+
+const field: React.CSSProperties = {
+  background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)",
+  color: "var(--fg)", padding: "10px 12px", fontSize: 14, outline: "none",
+};
+const primary: React.CSSProperties = {
+  background: "var(--accent)", color: "var(--bg)", border: "none", borderRadius: "var(--radius)",
+  padding: "10px", fontSize: 14, fontWeight: 600, cursor: "pointer",
+};

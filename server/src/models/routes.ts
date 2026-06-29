@@ -2,12 +2,14 @@ import { Readable } from "stream";
 import type { Express, Request, Response } from "express";
 import { MODEL_CATALOG, findModel } from "./catalog";
 import { modelManager } from "./manager";
+import { scopeId } from "../auth";
 
 type AuthFn = (req: Request) => boolean;
 
 function wsId(req: Request): string {
-  const id = String(req.query.ws ?? req.body?.ws ?? "workspace").trim();
-  return id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "workspace";
+  const raw = String(req.query.ws ?? req.body?.ws ?? "workspace").trim();
+  const clean = raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "workspace";
+  return scopeId(req, undefined, clean);
 }
 
 function sse(res: Response, obj: unknown) {
