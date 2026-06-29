@@ -22,6 +22,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // The on-device model engine (WebLLM) is large and loaded on demand —
+        // don't precache it in the service worker.
+        globIgnores: ["**/webllm-*.js"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\./,
@@ -32,6 +35,15 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("@mlc-ai/web-llm")) return "webllm";
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       "/pty": { target: "ws://localhost:3001", ws: true },

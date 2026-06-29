@@ -104,6 +104,7 @@ export const getWorkspaces = (): Promise<{ workspaces: { id: string; state: stri
 // --- open-model runner ---
 export interface ModelInfo {
   id: string; name: string; params: string; family: string; gpu: "cpu" | "a10g" | "a100"; sizeGb: number; blurb: string;
+  localTier: "easy" | "heavy" | "none"; mlcId?: string;
 }
 export interface RunningModel {
   workspace: string; modelId: string; name: string; status: string; startedAt: number; gpu: string | null; error?: string;
