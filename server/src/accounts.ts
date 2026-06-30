@@ -82,6 +82,11 @@ export function getUser(id: string): User | null {
   return load().users.find((x) => x.id === id) ?? null;
 }
 
+export function getUserByUsername(username: string): User | null {
+  const u = normUser(username);
+  return load().users.find((x) => x.username === u) ?? null;
+}
+
 export function userCount(): number {
   return load().users.length;
 }

@@ -2,15 +2,15 @@ import type { Express, Request } from "express";
 import { manager, billing, provider, WORKSPACE_ID } from "./index";
 import { buildInvoice } from "./billing";
 import { GPU_CATALOG, TIERS, type Tier } from "./types";
-import { scopeId, userIdOf } from "../auth";
-import { multiUserEnabled } from "../accounts";
+import { scopeId, activeNamespace } from "../auth";
 
 type AuthFn = (req: Request) => boolean;
 
-// In multi-user mode machine ids are "<userId>::<ws>". These helpers keep each
-// user's listing and billing to their own workspaces.
+// In multi-user mode machine ids are "<namespace>::<ws>" (namespace = a user or
+// a team). These helpers keep listing and billing to the active namespace.
 function mine(req: Request, id: string): boolean {
-  return !multiUserEnabled || id.startsWith(`${userIdOf(req)}::`);
+  const ns = activeNamespace(req);
+  return !ns || id.startsWith(`${ns}::`);
 }
 function bareWs(id: string): string {
   const i = id.indexOf("::");

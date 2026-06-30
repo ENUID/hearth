@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { IncomingMessage } from "http";
 import { multiUserEnabled, getUser } from "./accounts";
+import { isMember } from "./teams";
 
 // Minimal, dependency-free HMAC-signed token (JWT-style: header.payload.sig).
 const SECRET = process.env.HEARTH_JWT_SECRET ?? "dev-insecure-secret-change-me";
@@ -89,11 +90,38 @@ export function userIdOf(req: IncomingMessage, url?: URL): string {
   return decoded?.sub && decoded.sub !== "hearth" ? decoded.sub : "default";
 }
 
+/** Reads the requested scope ("me" or "team:<id>") from the query or body. */
+function scopeParam(req: IncomingMessage, url?: URL): string | undefined {
+  if (url) {
+    const s = url.searchParams.get("scope");
+    if (s) return s;
+  }
+  const anyReq = req as unknown as { query?: Record<string, unknown>; body?: Record<string, unknown> };
+  const v = anyReq.query?.scope ?? anyReq.body?.scope;
+  return typeof v === "string" ? v : undefined;
+}
+
 /**
- * Prefix an id (workspace / session) with the acting user's namespace. No-op
- * unless multi-user mode is on, so single-tenant deployments are unchanged.
+ * The namespace this request acts in: the acting user, or a team the user
+ * actually belongs to (membership is verified — a forged team scope falls back
+ * to the user's own namespace). Null in single-tenant mode.
+ */
+export function activeNamespace(req: IncomingMessage, url?: URL): string | null {
+  if (!multiUserEnabled) return null;
+  const uid = userIdOf(req, url);
+  const scope = scopeParam(req, url);
+  if (scope && scope.startsWith("team:")) {
+    const teamId = scope.slice(5);
+    if (isMember(teamId, uid)) return `team_${teamId}`;
+  }
+  return uid;
+}
+
+/**
+ * Prefix an id (workspace / session) with the active namespace (user or team).
+ * No-op unless multi-user mode is on, so single-tenant deployments are unchanged.
  */
 export function scopeId(req: IncomingMessage, url: URL | undefined, id: string): string {
-  if (!multiUserEnabled) return id;
-  return `${userIdOf(req, url)}::${id}`;
+  const ns = activeNamespace(req, url);
+  return ns ? `${ns}::${id}` : id;
 }

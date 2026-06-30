@@ -8,6 +8,7 @@ import { handlePtyConnection, killSession } from "./ptyHandler";
 import { handleDownload, handleUpload } from "./files";
 import { authEnabled, checkPassword, issueToken, isAuthorized, scopeId, decodeToken, tokenFromRequest } from "./auth";
 import { multiUserEnabled, createUser, verifyUser, getUser } from "./accounts";
+import { listTeamsForUser, createTeam, addMember, removeMember } from "./teams";
 import { mountControlPlane } from "./controlplane/routes";
 import { mountModels } from "./models/routes";
 import { mountAgents } from "./agents/routes";
@@ -93,6 +94,32 @@ app.post("/api/session/kill", (req, res) => {
   killSession(scopeId(req, reqUrl(req), String(req.query.sid ?? "")));
   res.json({ ok: true });
 });
+
+// Teams (Phase 3): shared workspaces + roles. Multi-user mode only.
+const currentUserId = (req: express.Request): string | null => {
+  const decoded = decodeToken(tokenFromRequest(req, reqUrl(req)));
+  return decoded && getUser(decoded.sub) ? decoded.sub : null;
+};
+const teamGuard = (handler: (req: express.Request, res: express.Response, uid: string) => void) =>
+  (req: express.Request, res: express.Response) => {
+    if (!multiUserEnabled) return res.status(404).json({ error: "teams are disabled" });
+    const uid = currentUserId(req);
+    if (!uid) return res.status(401).json({ error: "unauthorized" });
+    try {
+      handler(req, res, uid);
+    } catch (e) {
+      res.status(400).json({ error: (e as Error).message });
+    }
+  };
+
+app.get("/api/teams", teamGuard((_req, res, uid) => res.json({ teams: listTeamsForUser(uid) })));
+app.post("/api/teams", teamGuard((req, res, uid) => res.json({ team: createTeam(uid, String(req.body?.name ?? "")) })));
+app.post("/api/teams/:id/members", teamGuard((req, res, uid) =>
+  res.json({ team: addMember(String(req.params.id), uid, String(req.body?.username ?? ""), req.body?.role === "owner" ? "owner" : "member") })
+));
+app.delete("/api/teams/:id/members/:userId", teamGuard((req, res, uid) =>
+  res.json({ team: removeMember(String(req.params.id), uid, String(req.params.userId)) })
+));
 
 // Phase 2 control plane: machine sizing, scale-to-zero, GPU, metering, billing.
 mountControlPlane(app, (req) => isAuthorized(req, reqUrl(req)));
