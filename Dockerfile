@@ -25,6 +25,8 @@ RUN npm install \
 # Build client + server.
 COPY . .
 RUN npm run build
+# Make the `hearth` CLI (chat with your model in the terminal) available on PATH.
+RUN chmod +x /app/bin/hearth && ln -sf /app/bin/hearth /usr/local/bin/hearth
 
 ENV NODE_ENV=production \
     HOME=/root \

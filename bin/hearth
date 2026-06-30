@@ -1,0 +1,94 @@
+#!/usr/bin/env node
+/* hearth — chat with your running model right in the terminal.
+ *
+ *   hearth                  start an interactive chat (Ctrl-D to exit)
+ *   hearth ask "question"   one-shot, prints the answer and exits
+ *   hearth "question"       same as ask
+ *
+ * Talks to the OpenAI-compatible endpoint Hearth exposes ($HEARTH_MODEL_URL),
+ * which serves whichever model the workspace is running (or your own provider,
+ * if HEARTH_MODEL_URL/KEY point there). The terminal and the model, as one.
+ */
+const readline = require("readline");
+
+const BASE = (process.env.HEARTH_MODEL_URL || "http://localhost:3001/api/models/v1").replace(/\/$/, "");
+const KEY = process.env.HEARTH_MODEL_KEY || process.env.HEARTH_TOKEN || "hearth";
+
+async function stream(messages) {
+  let res;
+  try {
+    res = await fetch(`${BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${KEY}` },
+      body: JSON.stringify({ messages, stream: true }),
+    });
+  } catch (e) {
+    process.stdout.write(`\n[hearth] can't reach the model at ${BASE} (${e.message})\n`);
+    return "";
+  }
+  if (!res.ok) {
+    if (res.status === 409) {
+      process.stdout.write("\n[hearth] no model is running. Open the ✦ models panel and start one (or set HEARTH_MODEL_URL to your own provider).\n");
+    } else {
+      process.stdout.write(`\n[hearth] error ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}\n`);
+    }
+    return "";
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let acc = "";
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue;
+      const p = line.slice(5).trim();
+      if (p === "[DONE]") continue;
+      try {
+        const d = JSON.parse(p).choices?.[0]?.delta?.content;
+        if (d) {
+          process.stdout.write(d);
+          acc += d;
+        }
+      } catch {
+        /* ignore keepalives */
+      }
+    }
+  }
+  process.stdout.write("\n");
+  return acc;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  if (args.length && args[0] !== "chat") {
+    const q = args[0] === "ask" ? args.slice(1).join(" ") : args.join(" ");
+    if (q.trim()) await stream([{ role: "user", content: q }]);
+    return;
+  }
+
+  process.stdout.write("hearth — chat with your model. Ctrl-D to exit.\n");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "› " });
+  const history = [];
+  rl.prompt();
+  rl.on("line", async (line) => {
+    const text = line.trim();
+    if (!text) return rl.prompt();
+    history.push({ role: "user", content: text });
+    rl.pause();
+    const reply = await stream(history);
+    history.push({ role: "assistant", content: reply });
+    rl.resume();
+    rl.prompt();
+  });
+  rl.on("close", () => {
+    process.stdout.write("\nbye.\n");
+    process.exit(0);
+  });
+}
+
+main();

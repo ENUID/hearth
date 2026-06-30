@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import * as pty from "node-pty";
 import { WebSocket } from "ws";
 import { loadBuffer, saveBuffer, deleteBuffer } from "./persistence";
@@ -70,6 +71,9 @@ function getOrCreateSession(sid: string): Session {
       // Hearth-specific name on purpose — we don't override OPENAI_BASE_URL,
       // which would silently hijack a user's real OpenAI key.
       HEARTH_MODEL_URL: `http://localhost:${process.env.PORT ?? "3001"}/api/models/v1`,
+      // Put the `hearth` CLI on PATH so you can chat with your model right in the
+      // terminal (in the workspace image it's installed to /usr/local/bin).
+      PATH: `${path.resolve(__dirname, "../../bin")}:${process.env.PATH ?? ""}`,
     } as Record<string, string>,
   });
 

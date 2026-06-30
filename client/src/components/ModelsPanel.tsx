@@ -255,6 +255,12 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
             {!local && cloud!.status === "starting" && <div style={{ fontSize: 12, color: "var(--fg-muted)", marginTop: 6 }}>{msg || "starting…"}</div>}
             {!local && cloud!.status === "running" && isChat && (
               <div style={{ marginTop: 8 }}>
+                <div style={{ background: "var(--accent-soft)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "8px 10px", marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--fg)" }}>
+                    Chat in your terminal — type <code style={{ fontFamily: "var(--font-mono)", color: "var(--accent)", fontWeight: 600 }}>hearth</code>
+                  </span>
+                  <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 2 }}>the model and the terminal, as one · or chat below</div>
+                </div>
                 <div style={{ fontSize: 10, color: "var(--fg-subtle)", textTransform: "uppercase", letterSpacing: "0.05em" }}>API endpoint</div>
                 <div onClick={() => navigator.clipboard?.writeText(endpoint).then(() => setMsg("copied")).catch(() => {})} title="copy"
                   style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-muted)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "6px 8px", marginTop: 4, cursor: "pointer", wordBreak: "break-all" }}>
