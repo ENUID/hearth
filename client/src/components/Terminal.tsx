@@ -21,8 +21,8 @@ const FONT_STACK =
 function xtermTheme(resolved: "light" | "dark"): ITheme {
   if (resolved === "light") {
     return {
-      background: "#ffffff", foreground: "#15171a", cursor: "#15171a", cursorAccent: "#ffffff",
-      selectionBackground: "rgba(21,23,26,0.14)",
+      background: "#ffffff", foreground: "#15171a", cursor: "#c2410c", cursorAccent: "#ffffff",
+      selectionBackground: "rgba(194,65,12,0.16)",
       black: "#383a42", red: "#d14b46", green: "#4a8f3c", yellow: "#b07d00",
       blue: "#2f6fdb", magenta: "#9a3fb5", cyan: "#2a8a99", white: "#4b4f55",
       brightBlack: "#9aa0a6", brightRed: "#e05c55", brightGreen: "#5aa248", brightYellow: "#c2920f",
@@ -30,8 +30,8 @@ function xtermTheme(resolved: "light" | "dark"): ITheme {
     };
   }
   return {
-    background: "#0b0c0e", foreground: "#e8e9ea", cursor: "#e8e9ea", cursorAccent: "#0b0c0e",
-    selectionBackground: "rgba(232,233,234,0.18)",
+    background: "#0a0a0c", foreground: "#e8e9ea", cursor: "#ff7a45", cursorAccent: "#0a0a0c",
+    selectionBackground: "rgba(255,122,69,0.22)",
     black: "#2b2e33", red: "#e06c75", green: "#98c379", yellow: "#e5c07b",
     blue: "#61afef", magenta: "#c678dd", cyan: "#56b6c2", white: "#d7dae0",
     brightBlack: "#5f646a", brightRed: "#e6747d", brightGreen: "#a6cf86", brightYellow: "#ecc98a",
@@ -245,9 +245,9 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
     const opts = {
       decorations: {
         matchBackground: "#6b7177",
-        activeMatchBackground: "#e8e9ea",
+        activeMatchBackground: "#ff7a45",
         matchOverviewRuler: "#6b7177",
-        activeMatchColorOverviewRuler: "#e8e9ea",
+        activeMatchColorOverviewRuler: "#ff7a45",
       },
     };
     if (dir === "next") searchRef.current?.findNext(q, opts);
@@ -261,7 +261,7 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
   }
 
   return (
-    <div style={{ position: "relative", flex: 1, overflow: "hidden", height: "100%" }}>
+    <div className="hearth-term" style={{ position: "relative", flex: 1, overflow: "hidden", height: "100%" }}>
       <div
         ref={containerRef}
         style={{ width: "100%", height: "100%", padding: "8px 4px 4px 8px", background: "var(--bg)" }}

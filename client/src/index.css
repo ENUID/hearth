@@ -4,36 +4,42 @@
   padding: 0;
 }
 
-/* ── Minimal monochrome design tokens ── */
+/* ── Hearth design tokens: neutral chrome, one signature accent (ember) ── */
 :root,
 :root[data-theme="dark"] {
-  --bg: #0b0c0e;
-  --bg-elevated: #141518;
+  --bg: #0a0a0c;
+  --bg-elevated: #131316;
+  --bg-glass: rgba(19, 19, 22, 0.78);
   --bg-inset: #08090a;
   --fg: #e8e9ea;
   --fg-muted: #969a9f;
   --fg-subtle: #5f646a;
   --border: #1c1e22;
   --border-strong: #2b2e33;
-  --accent: #e8e9ea;          /* monochrome: accent == foreground */
-  --accent-soft: rgba(232, 233, 234, 0.10);
-  --selection: rgba(232, 233, 234, 0.16);
-  --danger: #d98c8c;
+  --accent: #ff7a45;          /* ember */
+  --accent-2: #ffb454;        /* amber — paired with --accent for gradients */
+  --accent-soft: rgba(255, 122, 69, 0.12);
+  --accent-glow: rgba(255, 122, 69, 0.45);
+  --selection: rgba(255, 122, 69, 0.22);
+  --danger: #e2615a;
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
   --bg: #ffffff;
-  --bg-elevated: #f6f7f8;
+  --bg-elevated: #f8f6f4;
+  --bg-glass: rgba(248, 246, 244, 0.82);
   --bg-inset: #fbfbfc;
   --fg: #15171a;
   --fg-muted: #5c6166;
   --fg-subtle: #9aa0a6;
   --border: #e7e9ec;
   --border-strong: #d3d7db;
-  --accent: #15171a;
-  --accent-soft: rgba(21, 23, 26, 0.06);
-  --selection: rgba(21, 23, 26, 0.12);
+  --accent: #c2410c;
+  --accent-2: #d97706;
+  --accent-soft: rgba(194, 65, 12, 0.08);
+  --accent-glow: rgba(194, 65, 12, 0.30);
+  --selection: rgba(194, 65, 12, 0.14);
   --danger: #b4453f;
   color-scheme: light;
 }
@@ -43,6 +49,7 @@
   --font-sans: system-ui, -apple-system, sans-serif;
   --radius: 8px;
   --radius-sm: 5px;
+  --accent-gradient: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
 }
 
 html, body, #root {
@@ -74,3 +81,22 @@ button { font-family: inherit; }
 .hearth-fade { animation: hearthFade 0.12s ease-out; }
 @keyframes hearthFade { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
 @keyframes hearthPop { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* signature ember glow line — Hearth's one fixed brand mark, always lit */
+.hearth-glowbar {
+  height: 2px;
+  flex-shrink: 0;
+  background: var(--accent-gradient);
+  box-shadow: 0 0 10px var(--accent-glow), 0 0 2px var(--accent-glow);
+}
+
+/* a "lit" pulse for live/active state (running machine, streaming model) */
+@keyframes hearthPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 9px 2px var(--accent-glow); }
+}
+.hearth-pulse { animation: hearthPulse 1.8s ease-in-out infinite; border-radius: 999px; }
+
+/* the active terminal pane gets a faint ember edge when focused — terminal
+   and model feel like one lit surface, not a plain black box */
+.hearth-term:focus-within { box-shadow: inset 0 0 0 1px var(--accent-soft); }

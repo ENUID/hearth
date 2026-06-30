@@ -318,8 +318,12 @@ export default function App() {
 
   return (
     <div ref={rootRef} style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+      <div className="hearth-glowbar" />
       <div style={headerStyle}>
-        <span style={{ fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em", fontFamily: "var(--font-mono)", fontSize: 13 }}>hearth</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <FlameMark />
+          <span style={{ fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em", fontFamily: "var(--font-mono)", fontSize: 13 }}>hearth</span>
+        </span>
 
         {/* scope switcher (personal / team) */}
         {multiUser && (
@@ -380,12 +384,16 @@ export default function App() {
 
         {/* tabs for the active workspace */}
         <div style={{ display: "flex", alignItems: "center", gap: 2, overflowX: "auto", flex: 1 }}>
-          {cur.tabs.map((t) => (
-            <button key={t.id} onClick={() => selectTab(t.id)} style={{ ...tabChip, color: t.id === cur.active ? "var(--fg)" : "var(--fg-subtle)", background: t.id === cur.active ? "var(--accent-soft)" : "transparent" }}>
-              {t.title}
-              <span onClick={(e) => { e.stopPropagation(); closeTab(t.id); }} title="close tab" style={{ opacity: 0.5, fontSize: 13, lineHeight: 1 }}>×</span>
-            </button>
-          ))}
+          {cur.tabs.map((t) => {
+            const isActive = t.id === cur.active;
+            return (
+              <button key={t.id} onClick={() => selectTab(t.id)} style={{ ...tabChip, position: "relative", color: isActive ? "var(--fg)" : "var(--fg-subtle)", background: isActive ? "var(--accent-soft)" : "transparent" }}>
+                {t.title}
+                <span onClick={(e) => { e.stopPropagation(); closeTab(t.id); }} title="close tab" style={{ opacity: 0.5, fontSize: 13, lineHeight: 1 }}>×</span>
+                {isActive && <span style={tabGlow} />}
+              </button>
+            );
+          })}
           <button onClick={newTab} title="new tab" style={{ ...ghostBtn, fontSize: 15, padding: "2px 7px" }}>+</button>
         </div>
 
@@ -405,7 +413,7 @@ export default function App() {
           ◆ agents
         </button>
         <button onClick={() => setMachineOpen(true)} title="machine" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ color: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", fontSize: 8 }}>●</span>
+          <span className={machineState === "running" ? "hearth-pulse" : undefined} style={{ color: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", fontSize: 8, display: "inline-block" }}>●</span>
           <span style={{ color: "var(--fg-muted)" }}>{machineState || "machine"}</span>
         </button>
         <button onClick={() => setSettingsOpen(true)} title="settings" style={{ ...ghostBtn, display: "flex", alignItems: "center", padding: "4px 6px" }} aria-label="settings">
@@ -471,6 +479,23 @@ export default function App() {
   );
 }
 
+function FlameMark() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="hearthFlameGrad" x1="0" y1="24" x2="0" y2="0">
+          <stop offset="0%" style={{ stopColor: "var(--accent)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--accent-2)" }} />
+        </linearGradient>
+      </defs>
+      <path
+        fill="url(#hearthFlameGrad)"
+        d="M12 2c.6 2.6-.4 4.3-2 6-1.8 1.9-3 3.8-3 6.3A5 5 0 0 0 12 19a5 5 0 0 0 5-4.7c.1-1.7-.6-2.9-1.6-4 .1 1.6-.5 2.6-1.4 3.3-.3-1.6-1-2.4-2-3.3-1.1-1-1.4-2.3-1-3.8.9.4 1.6 1 2 2 .8-1.7.7-3.6-1-6.5Z"
+      />
+    </svg>
+  );
+}
+
 function GearIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -481,7 +506,7 @@ function GearIcon() {
 }
 
 const MACHINE_STATE_COLOR: Record<string, string> = {
-  running: "var(--fg)",
+  running: "var(--accent)",
   asleep: "var(--fg-subtle)",
   waking: "var(--fg-muted)",
   provisioning: "var(--fg-muted)",
@@ -495,8 +520,20 @@ const headerStyle: React.CSSProperties = {
   padding: "0 12px",
   gap: 4,
   borderBottom: "1px solid var(--border)",
-  background: "var(--bg-elevated)",
+  background: "var(--bg-glass)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
   flexShrink: 0,
+};
+const tabGlow: React.CSSProperties = {
+  position: "absolute",
+  left: 6,
+  right: 6,
+  bottom: 0,
+  height: 2,
+  borderRadius: 2,
+  background: "var(--accent-gradient)",
+  boxShadow: "0 0 6px var(--accent-glow)",
 };
 const ghostBtn: React.CSSProperties = {
   background: "transparent",

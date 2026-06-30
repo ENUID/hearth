@@ -235,7 +235,7 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
         <>
           <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: chatEnabled ? "var(--fg)" : "var(--fg-muted)", fontSize: 8 }}>●</span>
+              <span className={chatEnabled ? "hearth-pulse" : undefined} style={{ color: chatEnabled ? "var(--accent)" : "var(--fg-muted)", fontSize: 8, display: "inline-block" }}>●</span>
               <span style={{ fontWeight: 600 }}>{local ? local.model.name : cloud!.name}</span>
               <span style={badge}>{local ? "on your device" : cloud!.gpu ? gpuBadge[cloud!.gpu] ?? cloud!.gpu : "cloud"}</span>
               <button disabled={busy} onClick={stop} style={{ ...secondaryBtn, marginLeft: "auto", width: "auto", padding: "5px 10px" }}>Stop</button>
