@@ -1,7 +1,7 @@
 import { useState, FormEvent } from "react";
 import { login, signup } from "../lib/api";
 
-export default function Login({ onAuthed, multiUser }: { onAuthed: () => void; multiUser: boolean }) {
+export default function Login({ onAuthed, multiUser, instanceName = "hearth", signupsOpen = true }: { onAuthed: () => void; multiUser: boolean; instanceName?: string; signupsOpen?: boolean }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [creating, setCreating] = useState(false);
@@ -31,7 +31,7 @@ export default function Login({ onAuthed, multiUser }: { onAuthed: () => void; m
   return (
     <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
       <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12, width: 300, padding: 24, background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10 }}>
-        <div style={{ fontWeight: 700, color: "var(--fg)", fontFamily: "var(--font-mono)", fontSize: 20, letterSpacing: "-0.02em" }}>hearth</div>
+        <div style={{ fontWeight: 700, color: "var(--fg)", fontFamily: "var(--font-mono)", fontSize: 20, letterSpacing: "-0.02em" }}>{instanceName}</div>
         <div style={{ color: "var(--fg-subtle)", fontSize: 12, marginTop: -6, marginBottom: 4 }}>
           {multiUser ? (creating ? "create your account" : "sign in to your computer") : "your computer, in the browser"}
         </div>
@@ -63,7 +63,7 @@ export default function Login({ onAuthed, multiUser }: { onAuthed: () => void; m
           {busy ? "…" : multiUser ? (creating ? "Create account" : "Sign in") : "Enter"}
         </button>
 
-        {multiUser && (
+        {multiUser && signupsOpen && (
           <button
             type="button"
             onClick={() => { setCreating((c) => !c); setError(""); }}
@@ -71,6 +71,9 @@ export default function Login({ onAuthed, multiUser }: { onAuthed: () => void; m
           >
             {creating ? "Have an account? Sign in" : "New here? Create an account"}
           </button>
+        )}
+        {multiUser && !signupsOpen && (
+          <div style={{ color: "var(--fg-subtle)", fontSize: 11 }}>Signups are closed on this instance.</div>
         )}
       </form>
     </div>

@@ -8,12 +8,24 @@ services:
       dockerfile: docker/Dockerfile
     ports:
       - "3001:3001"
+    # Reads optional overrides from ../.env (copy from ../.env.example).
+    env_file:
+      - path: ../.env
+        required: false
     environment:
       PORT: "3001"
-      # Auth is off by default. Uncomment all three to require a password:
-      # HEARTH_REQUIRE_AUTH: "true"
-      # HEARTH_PASSWORD: "change-me"
-      # HEARTH_JWT_SECRET: "a-long-random-secret"
+      # Instance / org settings (self-host)
+      HEARTH_INSTANCE_NAME: "${HEARTH_INSTANCE_NAME:-Hearth}"
+      HEARTH_SIGNUPS_OPEN: "${HEARTH_SIGNUPS_OPEN:-true}"
+      # Auth — pick ONE:
+      #  A) single shared password: set HEARTH_REQUIRE_AUTH=true + HEARTH_PASSWORD
+      #  B) multi-user accounts + teams: set HEARTH_MULTIUSER=true
+      HEARTH_REQUIRE_AUTH: "${HEARTH_REQUIRE_AUTH:-false}"
+      HEARTH_PASSWORD: "${HEARTH_PASSWORD:-}"
+      HEARTH_MULTIUSER: "${HEARTH_MULTIUSER:-false}"
+      HEARTH_JWT_SECRET: "${HEARTH_JWT_SECRET:-change-me}"
+      # Open-model runner backend (stub | ollama)
+      HEARTH_MODEL_BACKEND: "${HEARTH_MODEL_BACKEND:-stub}"
     volumes:
       # Persistent home — also holds session scrollback (~/.hearth/sessions),
       # so terminals replay after reconnect and across restarts.

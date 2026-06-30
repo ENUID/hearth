@@ -123,6 +123,24 @@ tab (`HEARTH_PASSWORD`). Works on **Fly.io / Railway** too (same `Dockerfile`).
 
 To require a password, set `HEARTH_REQUIRE_AUTH=true`, `HEARTH_PASSWORD`, and `HEARTH_JWT_SECRET` (see `.env.example`).
 
+### Self-host with multi-user accounts + teams
+
+One command, persistent state, your own instance:
+
+```bash
+cp .env.example .env          # set HEARTH_MULTIUSER=true and a HEARTH_JWT_SECRET
+docker compose -f docker/docker-compose.yml up -d --build
+```
+
+- **`HEARTH_MULTIUSER=true`** — each person signs up / signs in and gets their
+  own isolated workspaces, terminals, and machines. **Teams** share workspaces
+  (switch scope in the header). Accounts and teams persist on the volume.
+- **`HEARTH_INSTANCE_NAME`** — the name shown on the login screen.
+- **`HEARTH_SIGNUPS_OPEN=false`** — close new signups once your team is set up
+  (the first account is always allowed, so you can bootstrap an admin).
+
+Single shared password instead? Set `HEARTH_REQUIRE_AUTH=true` + `HEARTH_PASSWORD`.
+
 ## Status
 
 🚧 Early development — **Phase 1** is functional end-to-end: browser terminal → WebSocket → persistent Linux container, with tabs, file transfer, auth, and reconnect/persistence. Real shell, real filesystem, install anything.
@@ -131,7 +149,12 @@ To require a password, set `HEARTH_REQUIRE_AUTH=true`, `HEARTH_PASSWORD`, and `H
 
 - **Phase 1** ✅ — A real, fully-capable cloud terminal from any device.
 - **Phase 2** ✅ (control plane) — Resize CPU/RAM/GPU on demand, scale-to-zero, metering + billing. Local backend is built and tested; Docker/Kubernetes/Stripe are real adapters that activate with the matching environment/credentials.
-- **Phase 3** (in progress) — Multiple workspaces ✅ (each its own machine, tabs, and home); next: multi-user teams and self-host packaging.
+- **Phase 3** ✅ — Multiple workspaces (each its own machine, tabs, and home);
+  multi-user accounts with per-user isolation; teams with shared workspaces +
+  roles; one-command self-host with instance/org settings. Open-model runner is
+  multi-modal (chat · image · audio · video); chat runs on-device or cloud,
+  other modalities provision a GPU (per-modality serving stack is
+  deploy-configured).
 
 ## Tech
 

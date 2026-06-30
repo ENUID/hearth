@@ -57,7 +57,7 @@ function withScope(path: string): string {
   return path + (path.includes("?") ? "&" : "?") + "scope=" + encodeURIComponent(s);
 }
 
-export async function getConfig(): Promise<{ authRequired: boolean; multiUser: boolean }> {
+export async function getConfig(): Promise<{ authRequired: boolean; multiUser: boolean; instanceName?: string; signupsOpen?: boolean }> {
   const r = await fetch("/api/config");
   return r.json();
 }

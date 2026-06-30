@@ -7,13 +7,19 @@ import { URL } from "url";
 import { handlePtyConnection, killSession } from "./ptyHandler";
 import { handleDownload, handleUpload } from "./files";
 import { authEnabled, checkPassword, issueToken, isAuthorized, scopeId, decodeToken, tokenFromRequest } from "./auth";
-import { multiUserEnabled, createUser, verifyUser, getUser } from "./accounts";
+import { multiUserEnabled, createUser, verifyUser, getUser, userCount } from "./accounts";
 import { listTeamsForUser, createTeam, addMember, removeMember } from "./teams";
 import { mountControlPlane } from "./controlplane/routes";
 import { mountModels } from "./models/routes";
 import { mountAgents } from "./agents/routes";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
+
+// --- instance / org settings (self-host) ---
+const INSTANCE_NAME = process.env.HEARTH_INSTANCE_NAME ?? "Hearth";
+// Open signups by default; an admin can close them (HEARTH_SIGNUPS_OPEN=false)
+// once the team is set up. The very first account is always allowed (bootstrap).
+const signupsOpen = (): boolean => process.env.HEARTH_SIGNUPS_OPEN !== "false" || userCount() === 0;
 
 const app = express();
 app.use(express.json());
@@ -22,15 +28,20 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, ts: Date.now() });
 });
 
-// Tells the client whether it must authenticate, and which mode.
+// Tells the client whether it must authenticate, and which mode, plus the
+// instance name and whether new signups are allowed (self-host org settings).
 app.get("/api/config", (_req, res) => {
-  res.json({ authRequired: authEnabled, multiUser: multiUserEnabled });
+  res.json({ authRequired: authEnabled, multiUser: multiUserEnabled, instanceName: INSTANCE_NAME, signupsOpen: signupsOpen() });
 });
 
 // Create an account (multi-user mode only).
 app.post("/api/signup", (req, res) => {
   if (!multiUserEnabled) {
     res.status(404).json({ error: "signups are disabled" });
+    return;
+  }
+  if (!signupsOpen()) {
+    res.status(403).json({ error: "signups are closed on this instance" });
     return;
   }
   try {

@@ -43,10 +43,12 @@ export default function App() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [multiUser, setMultiUser] = useState(false);
   const [me, setMe] = useState<string | null>(null);
+  const [instance, setInstance] = useState<{ name: string; signupsOpen: boolean }>({ name: "Hearth", signupsOpen: true });
   useEffect(() => {
     getConfig()
       .then((c) => {
         setMultiUser(c.multiUser);
+        setInstance({ name: c.instanceName ?? "Hearth", signupsOpen: c.signupsOpen ?? true });
         setNeedsLogin(c.authRequired && !getToken());
         if (c.multiUser && getToken()) getMe().then((m) => setMe(m.user?.username ?? null)).catch(() => {});
       })
@@ -288,7 +290,7 @@ export default function App() {
   ];
 
   if (!authResolved) return null;
-  if (needsLogin) return <Login onAuthed={onAuthed} multiUser={multiUser} />;
+  if (needsLogin) return <Login onAuthed={onAuthed} multiUser={multiUser} instanceName={instance.name} signupsOpen={instance.signupsOpen} />;
 
   const activeWsName = workspaces.find((w) => w.id === activeWs)?.name ?? activeWs;
 
