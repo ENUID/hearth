@@ -4,10 +4,27 @@ import { URL } from "url";
 import type { Request, Response } from "express";
 import { getSessionCwd } from "./ptyHandler";
 import { scopeId } from "./auth";
+import { multiUserEnabled } from "./accounts";
+
+const HOME = path.resolve(process.env.HOME ?? "/home");
 
 function resolveInSession(sid: string, p: string): string {
   if (path.isAbsolute(p)) return p;
   return path.resolve(getSessionCwd(sid), p);
+}
+
+/**
+ * In multi-user mode, confine file transfer to the workspace home so a request
+ * can't read/write outside it via an absolute path or `..`. (With a container
+ * per workspace this is also enforced by the container; this is defense in
+ * depth for the shared-host fallback.) Single-tenant = your own box, no limit.
+ */
+function assertAllowed(target: string): void {
+  if (!multiUserEnabled) return;
+  const resolved = path.resolve(target);
+  if (resolved !== HOME && !resolved.startsWith(HOME + path.sep)) {
+    throw new Error("path is outside your workspace");
+  }
 }
 
 /** Per-user session key (matches how the PTY upgrade scopes the session). */
@@ -24,6 +41,12 @@ export function handleDownload(req: Request, res: Response) {
     return;
   }
   const target = resolveInSession(sid, p);
+  try {
+    assertAllowed(target);
+  } catch (e) {
+    res.status(403).json({ error: (e as Error).message });
+    return;
+  }
   fs.stat(target, (err, st) => {
     if (err || !st.isFile()) {
       res.status(404).json({ error: "not a file" });
@@ -43,6 +66,12 @@ export function handleUpload(req: Request, res: Response) {
     return;
   }
   const target = path.join(getSessionCwd(sid), name);
+  try {
+    assertAllowed(target);
+  } catch (e) {
+    res.status(403).json({ error: (e as Error).message });
+    return;
+  }
   const out = fs.createWriteStream(target);
   let bytes = 0;
   req.on("data", (chunk) => (bytes += chunk.length));

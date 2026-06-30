@@ -20,6 +20,8 @@ export interface User {
   salt: string; // hex
   hash: string; // hex (scrypt)
   createdAt: number;
+  /** Bumped to invalidate all existing tokens (password change / sign-out-all). */
+  tokenVersion: number;
 }
 
 type Store = { users: User[] };
@@ -57,10 +59,40 @@ export function createUser(username: string, password: string): User {
   const store = load();
   if (store.users.some((x) => x.username === u)) throw new Error("username already taken");
   const salt = crypto.randomBytes(16).toString("hex");
-  const user: User = { id: crypto.randomUUID(), username: u, salt, hash: hashPassword(password, salt), createdAt: Date.now() };
+  const user: User = { id: crypto.randomUUID(), username: u, salt, hash: hashPassword(password, salt), createdAt: Date.now(), tokenVersion: 0 };
   store.users.push(user);
   save(store);
   return user;
+}
+
+/** Current token version for a user (0 if unknown). Tokens must match it. */
+export function tokenVersionOf(id: string): number {
+  return load().users.find((x) => x.id === id)?.tokenVersion ?? 0;
+}
+
+/** Invalidate every existing token for a user (sign out everywhere). */
+export function bumpTokenVersion(id: string): number {
+  const store = load();
+  const user = store.users.find((x) => x.id === id);
+  if (!user) return 0;
+  user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+  save(store);
+  return user.tokenVersion;
+}
+
+/** Change a password (requires the current one). Invalidates old tokens. */
+export function changePassword(id: string, current: string, next: string): void {
+  if (next.length < 6) throw new Error("password must be at least 6 characters");
+  const store = load();
+  const user = store.users.find((x) => x.id === id);
+  if (!user) throw new Error("no such user");
+  const got = Buffer.from(hashPassword(current, user.salt), "hex");
+  const want = Buffer.from(user.hash, "hex");
+  if (got.length !== want.length || !crypto.timingSafeEqual(got, want)) throw new Error("current password is wrong");
+  user.salt = crypto.randomBytes(16).toString("hex");
+  user.hash = hashPassword(next, user.salt);
+  user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+  save(store);
 }
 
 /** Verify credentials. Returns the user on success, null otherwise (constant-time). */

@@ -6,12 +6,13 @@ import { WebSocketServer } from "ws";
 import { URL } from "url";
 import { handlePtyConnection, killSession } from "./ptyHandler";
 import { handleDownload, handleUpload } from "./files";
-import { authEnabled, checkPassword, issueToken, isAuthorized, scopeId, decodeToken, tokenFromRequest } from "./auth";
-import { multiUserEnabled, createUser, verifyUser, getUser, userCount } from "./accounts";
+import { authEnabled, checkPassword, issueToken, isAuthorized, scopeId, decodeToken, tokenFromRequest, assertSecretStrength } from "./auth";
+import { multiUserEnabled, createUser, verifyUser, getUser, userCount, bumpTokenVersion, changePassword } from "./accounts";
 import { listTeamsForUser, createTeam, addMember, removeMember } from "./teams";
 import { mountControlPlane } from "./controlplane/routes";
 import { mountModels } from "./models/routes";
 import { mountAgents } from "./agents/routes";
+import { securityHeaders, rateLimit } from "./security";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 
@@ -21,8 +22,29 @@ const INSTANCE_NAME = process.env.HEARTH_INSTANCE_NAME ?? "Hearth";
 // once the team is set up. The very first account is always allowed (bootstrap).
 const signupsOpen = (): boolean => process.env.HEARTH_SIGNUPS_OPEN !== "false" || userCount() === 0;
 
+// Refuse to start with a forgeable token secret when auth is enforced.
+assertSecretStrength();
+
+// Loud reminder: app-level namespacing isolates DATA between users, but the PTY
+// spawns on the host, so terminals are NOT OS-isolated from each other. Safe for
+// a trusted team; for UNTRUSTED users you must run a container/microVM per
+// workspace (Docker/Kubernetes provider) and serve over HTTPS. See SECURITY.md.
+if (multiUserEnabled) {
+  console.warn(
+    "[hearth] multi-user mode ON. Per-user DATA is isolated, but terminals share the host OS.\n" +
+      "         For untrusted users: run a container per workspace + HTTPS. See SECURITY.md."
+  );
+}
+
 const app = express();
-app.use(express.json());
+// Behind a reverse proxy/load balancer (the expected prod setup): trust it so
+// req.ip / protocol reflect the real client (used by the rate limiter).
+app.set("trust proxy", process.env.HEARTH_TRUST_PROXY === "false" ? false : true);
+app.use(securityHeaders);
+app.use(express.json({ limit: "1mb" }));
+
+// Brute-force protection on the credential endpoints.
+const authLimiter = rateLimit({ windowMs: 5 * 60_000, max: 20, message: "too many attempts — try again in a few minutes" });
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, ts: Date.now() });
@@ -35,7 +57,7 @@ app.get("/api/config", (_req, res) => {
 });
 
 // Create an account (multi-user mode only).
-app.post("/api/signup", (req, res) => {
+app.post("/api/signup", authLimiter, (req, res) => {
   if (!multiUserEnabled) {
     res.status(404).json({ error: "signups are disabled" });
     return;
@@ -54,7 +76,7 @@ app.post("/api/signup", (req, res) => {
 
 // Exchange credentials for a token. Multi-user → username+password; single
 // tenant → the shared password.
-app.post("/api/login", (req, res) => {
+app.post("/api/login", authLimiter, (req, res) => {
   if (multiUserEnabled) {
     const user = verifyUser(String(req.body?.username ?? ""), String(req.body?.password ?? ""));
     if (user) res.json({ token: issueToken(user.id), username: user.username });
@@ -87,6 +109,32 @@ app.get("/api/me", (req, res) => {
 // Auth check that also accepts a `?token=` query param (browser download links
 // and WebSockets can't set an Authorization header).
 const reqUrl = (req: express.Request) => new URL(req.url, "http://localhost");
+
+// Change password (invalidates all existing tokens for the user).
+app.post("/api/account/password", authLimiter, (req, res) => {
+  if (!multiUserEnabled || !isAuthorized(req, reqUrl(req))) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const decoded = decodeToken(tokenFromRequest(req, reqUrl(req)))!;
+  try {
+    changePassword(decoded.sub, String(req.body?.current ?? ""), String(req.body?.next ?? ""));
+    res.json({ token: issueToken(decoded.sub) }); // fresh token at the new version
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+// Sign out of every device (revoke all tokens for the user).
+app.post("/api/account/signout-all", (req, res) => {
+  if (!multiUserEnabled || !isAuthorized(req, reqUrl(req))) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const decoded = decodeToken(tokenFromRequest(req, reqUrl(req)))!;
+  bumpTokenVersion(decoded.sub);
+  res.json({ ok: true });
+});
 
 // Auth gate for the REST API.
 app.use("/api/files", (req, res, next) => {

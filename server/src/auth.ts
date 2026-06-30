@@ -1,12 +1,30 @@
 import crypto from "crypto";
 import type { IncomingMessage } from "http";
-import { multiUserEnabled, getUser } from "./accounts";
+import { multiUserEnabled, getUser, tokenVersionOf } from "./accounts";
 import { isMember } from "./teams";
 
 // Minimal, dependency-free HMAC-signed token (JWT-style: header.payload.sig).
 const SECRET = process.env.HEARTH_JWT_SECRET ?? "dev-insecure-secret-change-me";
 const PASSWORD = process.env.HEARTH_PASSWORD ?? "";
 const TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+
+const WEAK_SECRETS = new Set(["dev-insecure-secret-change-me", "change-me", ""]);
+/** True if the signing secret is a default/placeholder or too short to be safe. */
+export function secretIsWeak(): boolean {
+  return WEAK_SECRETS.has(SECRET) || SECRET.length < 16;
+}
+/**
+ * Fail closed: when auth is enforced, refuse to run with a weak signing secret
+ * (forgeable tokens). Override only for local dev with HEARTH_ALLOW_WEAK_SECRET=1.
+ */
+export function assertSecretStrength(): void {
+  if (authEnabled && secretIsWeak() && process.env.HEARTH_ALLOW_WEAK_SECRET !== "1") {
+    throw new Error(
+      "HEARTH_JWT_SECRET is weak or default. Set a long random secret (e.g. `openssl rand -hex 32`). " +
+        "To bypass for local dev only, set HEARTH_ALLOW_WEAK_SECRET=1."
+    );
+  }
+}
 
 /**
  * Auth is enforced in multi-user mode (per-user accounts), or in single-tenant
@@ -27,13 +45,14 @@ function hmac(data: string): string {
 export function issueToken(sub = "hearth"): string {
   const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const now = Math.floor(Date.now() / 1000);
-  const payload = b64url(JSON.stringify({ sub, iat: now, exp: now + TTL_SECONDS }));
+  const ver = sub !== "hearth" ? tokenVersionOf(sub) : 0;
+  const payload = b64url(JSON.stringify({ sub, ver, iat: now, exp: now + TTL_SECONDS }));
   const data = `${header}.${payload}`;
   return `${data}.${hmac(data)}`;
 }
 
 /** Returns the decoded payload if the token is valid (signature + expiry), else null. */
-export function decodeToken(token: string | undefined | null): { sub: string } | null {
+export function decodeToken(token: string | undefined | null): { sub: string; ver: number } | null {
   if (!token) return null;
   const parts = token.split(".");
   if (parts.length !== 3) return null;
@@ -43,9 +62,9 @@ export function decodeToken(token: string | undefined | null): { sub: string } |
   const b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   try {
-    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { exp?: number; sub?: string };
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { exp?: number; sub?: string; ver?: number };
     if (!decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) return null;
-    return { sub: typeof decoded.sub === "string" ? decoded.sub : "hearth" };
+    return { sub: typeof decoded.sub === "string" ? decoded.sub : "hearth", ver: typeof decoded.ver === "number" ? decoded.ver : 0 };
   } catch {
     return null;
   }
@@ -75,8 +94,9 @@ export function isAuthorized(req: IncomingMessage, url?: URL): boolean {
   if (!authEnabled) return true;
   const decoded = decodeToken(tokenFromRequest(req, url));
   if (!decoded) return false;
-  // In multi-user mode the token's subject must still resolve to a real user.
-  if (multiUserEnabled) return getUser(decoded.sub) !== null;
+  // In multi-user mode the token's subject must still resolve to a real user,
+  // and its version must match (so a password change / sign-out-all revokes it).
+  if (multiUserEnabled) return getUser(decoded.sub) !== null && decoded.ver === tokenVersionOf(decoded.sub);
   return true;
 }
 
