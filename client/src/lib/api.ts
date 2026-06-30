@@ -219,6 +219,17 @@ export async function generateSpeech(input: string, ws = "workspace"): Promise<{
 export const chargeNow = (): Promise<{ invoice: { totalCents: number }; result: { status: string; provider: string; amountCents: number } }> =>
   authedJson("/api/billing/charge", { method: "POST" });
 
+export interface UsageTotals { machineMinutes: number; machineCents: number; gpuMinutes: number; gpuCents: number; totalCents: number }
+export interface BillingSummary {
+  workspaces: { id: string; state: string; tier: string; usage: UsageTotals }[];
+  total: UsageTotals;
+  invoice: { currency: string; lines: { label: string; minutes: number; cents: number }[]; totalCents: number };
+  tiers: Record<string, { label: string; hourlyCents: number }>;
+  gpuCatalog: Record<string, { label: string; hourlyCents: number }>;
+  billing: { name: string; live: boolean };
+}
+export const getBillingSummary = (): Promise<BillingSummary> => authedJson("/api/billing/summary");
+
 // --- CLI agent catalog ---
 export interface AgentInfo {
   id: string; name: string; vendor: string; blurb: string;

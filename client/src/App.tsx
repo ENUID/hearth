@@ -8,6 +8,7 @@ import ModelsPanel from "./components/ModelsPanel";
 import AgentsPanel from "./components/AgentsPanel";
 import Welcome from "./components/Welcome";
 import TeamsPanel from "./components/TeamsPanel";
+import BillingPanel from "./components/BillingPanel";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
 import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession, getMe, logout, getScope, setScope, getTeams, signOutEverywhere, changePassword, type Team } from "./lib/api";
@@ -86,6 +87,7 @@ export default function App() {
   // --- teams / scope (multi-user) ---
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsOpen, setTeamsOpen] = useState(false);
+  const [billingOpen, setBillingOpen] = useState(false);
   const [scopeMenu, setScopeMenu] = useState(false);
   const scope = getScope();
   const loadTeams = useCallback(() => {
@@ -300,6 +302,7 @@ export default function App() {
     { id: "models", title: "Run an open-source model", hint: "ai", run: () => setModelsOpen(true) },
     { id: "agents", title: "Install a CLI agent (Claude Code, Aider…)", hint: "ai", run: () => setAgentsOpen(true) },
     { id: "machine", title: "Machine: size, GPU, usage", hint: "machine", run: () => setMachineOpen(true) },
+    { id: "billing", title: "Usage & billing", hint: "billing", run: () => setBillingOpen(true) },
     ...(multiUser ? [{ id: "teams", title: "Teams: shared workspaces", hint: "teams", run: () => setTeamsOpen(true) }] : []),
     { id: "welcome", title: "Show welcome / quick start", hint: "app", run: () => setWelcomeOpen(true) },
     { id: "settings", title: "Settings", hint: "app", run: () => setSettingsOpen(true) },
@@ -463,6 +466,7 @@ export default function App() {
         />
       )}
       {teamsOpen && <TeamsPanel me={me} onClose={() => setTeamsOpen(false)} onSwitchScope={switchScope} />}
+      {billingOpen && <BillingPanel onClose={() => setBillingOpen(false)} />}
     </div>
   );
 }

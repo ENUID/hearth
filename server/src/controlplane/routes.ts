@@ -102,6 +102,34 @@ export function mountControlPlane(app: Express, isAuthed: AuthFn): void {
     res.json({ usage, invoice: buildInvoice(usage) });
   }));
 
+  // Account-wide billing: per-workspace usage breakdown + the total invoice for
+  // everything in the caller's namespace (all their workspaces / their team's).
+  app.get("/api/billing/summary", guard(async (req, res) => {
+    const empty = { machineMinutes: 0, machineCents: 0, gpuMinutes: 0, gpuCents: 0, totalCents: 0 };
+    const workspaces = manager
+      .list()
+      .filter((m) => mine(req, m.id))
+      .map((m) => ({ id: bareWs(m.id), state: m.state, tier: m.tier, usage: manager.usageFor(m.id) }));
+    const total = workspaces.reduce(
+      (a, w) => ({
+        machineMinutes: a.machineMinutes + w.usage.machineMinutes,
+        machineCents: a.machineCents + w.usage.machineCents,
+        gpuMinutes: a.gpuMinutes + w.usage.gpuMinutes,
+        gpuCents: a.gpuCents + w.usage.gpuCents,
+        totalCents: a.totalCents + w.usage.totalCents,
+      }),
+      { ...empty }
+    );
+    res.json({
+      workspaces,
+      total,
+      invoice: buildInvoice(total),
+      tiers: TIERS,
+      gpuCatalog: GPU_CATALOG,
+      billing: { name: billing.name, live: billing.live },
+    });
+  }));
+
   app.post("/api/billing/charge", guard(async (req, res) => {
     // Bill across the caller's workspaces (one account).
     let total = 0;
