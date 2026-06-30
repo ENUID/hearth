@@ -141,6 +141,23 @@ docker compose -f docker/docker-compose.yml up -d --build
 
 Single shared password instead? Set `HEARTH_REQUIRE_AUTH=true` + `HEARTH_PASSWORD`.
 
+### Untrusted / public users → a microVM per workspace (Fly.io)
+
+A terminal is code execution, so strangers must never share a host. The ships-
+with **Fly.io** path gives each workspace its own Firecracker **microVM**
+(persistent + OS-isolated — the thing serverless platforms like Vercel can't do):
+
+```bash
+fly launch --no-deploy
+fly secrets set HEARTH_JWT_SECRET=$(openssl rand -hex 32) FLY_API_TOKEN=$(fly auth token)
+fly volumes create hearth_state --size 3
+fly deploy        # uses fly.toml (HEARTH_PROVIDER=fly + HEARTH_SHELL_CMD)
+```
+
+`HEARTH_PROVIDER=fly` provisions a machine per workspace; `HEARTH_SHELL_CMD`
+makes the terminal exec *inside* it. Read **[SECURITY.md](./SECURITY.md)** first —
+it's the threat model and the full operator checklist (caps, egress, TLS, backups).
+
 ## Status
 
 🚧 Early development — **Phase 1** is functional end-to-end: browser terminal → WebSocket → persistent Linux container, with tabs, file transfer, auth, and reconnect/persistence. Real shell, real filesystem, install anything.

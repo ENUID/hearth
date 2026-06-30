@@ -3,6 +3,7 @@ import { makeBilling } from "./billing";
 import { LocalProvider } from "./providers/local";
 import { DockerProvider } from "./providers/docker";
 import { KubernetesProvider } from "./providers/kubernetes";
+import { FlyProvider } from "./providers/fly";
 import type { MachineProvider } from "./provider";
 
 function makeProvider(): MachineProvider {
@@ -11,6 +12,8 @@ function makeProvider(): MachineProvider {
       return new DockerProvider();
     case "kubernetes":
       return new KubernetesProvider();
+    case "fly":
+      return new FlyProvider();
     default:
       return new LocalProvider();
   }

@@ -1,0 +1,39 @@
+# Deploy Hearth on Fly.io.
+#
+#   fly launch --no-deploy        # creates the app (pick a name + region)
+#   fly secrets set HEARTH_JWT_SECRET=$(openssl rand -hex 32)
+#   fly secrets set FLY_API_TOKEN=$(fly auth token)
+#   fly volumes create hearth_state --size 3
+#   fly deploy
+#
+# This app is the long-lived bridge (terminal + control plane). For UNTRUSTED
+# multi-tenant, each workspace runs as its own Fly *machine* (microVM) via the
+# Fly provider — set the [env] below and HEARTH_SHELL_CMD so terminals exec
+# into the per-workspace machine. See SECURITY.md.
+app = "hearth"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3001"
+  HEARTH_STATE_DIR = "/data/sessions"
+  HEARTH_MULTIUSER = "true"
+  HEARTH_INSTANCE_NAME = "Hearth"
+  # Per-workspace isolation: provision a microVM per workspace and exec into it.
+  HEARTH_PROVIDER = "fly"
+  HEARTH_SHELL_CMD = "flyctl ssh console -a hearth -m {workspace} -C /bin/bash"
+  # FLY_APP_NAME / FLY_API_TOKEN / HEARTH_JWT_SECRET come from `fly secrets`.
+
+# The bridge holds long-lived WebSocket/PTY connections — keep at least one
+# instance always running (do not scale this one to zero).
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = false
+  min_machines_running = 1
+
+[[mounts]]
+  source = "hearth_state"
+  destination = "/data"

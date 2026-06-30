@@ -26,11 +26,14 @@ Hearth prints a startup warning in multi-user mode to make this explicit.
 
 ## Required setup for untrusted multi-tenant
 
-1. **Container/microVM per workspace.** Use the Docker or Kubernetes machine
-   provider (`HEARTH_PROVIDER=docker|kubernetes`), or host on **Fly.io**
-   (Firecracker microVMs). The PTY for a workspace must exec **inside that
-   workspace's container**, never on the host. The in-process `local` provider
-   is for development and single-user only.
+1. **Container/microVM per workspace.** Use a real machine provider
+   (`HEARTH_PROVIDER=fly|docker|kubernetes`); **Fly.io** gives a Firecracker
+   microVM per workspace and is the recommended path (see `fly.toml`). The PTY
+   must exec **inside that workspace's machine**, never on the host — set
+   **`HEARTH_SHELL_CMD`** to the exec command (`docker exec` / `flyctl ssh
+   console` / `kubectl exec`, with `{workspace}` substituted). The in-process
+   `local` provider and the default host shell are for development / single-user
+   only.
 2. **Resource caps per container:** CPU, memory, PIDs (fork-bomb guard), and
    disk quota via cgroups. Set an idle timeout (scale-to-zero) and a hard
    per-tier quota.
@@ -69,7 +72,8 @@ Hearth prints a startup warning in multi-user mode to make this explicit.
 
 - [ ] `HEARTH_MULTIUSER=true`
 - [ ] `HEARTH_JWT_SECRET` = `openssl rand -hex 32` (kept out of version control)
-- [ ] Container/microVM **per workspace**; PTY execs inside it
+- [ ] `HEARTH_PROVIDER=fly` (or docker/kubernetes) — microVM/container per workspace
+- [ ] `HEARTH_SHELL_CMD` set so the PTY execs **inside** the workspace machine
 - [ ] CPU / memory / PID / disk caps + idle timeout per container
 - [ ] Egress restrictions from workspaces (block metadata IP; allowlist)
 - [ ] HTTPS/WSS only; HSTS on; valid certificate

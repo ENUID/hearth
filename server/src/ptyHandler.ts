@@ -27,6 +27,25 @@ const RECONNECT_GRACE_MS = 30_000;
 // How much recent output to retain for replay on reconnect (~200 KB scrollback).
 const MAX_BUFFER = 200_000;
 
+// How the PTY enters a workspace. By default it spawns a shell on the host
+// (single-user / dev). For untrusted multi-tenant, set HEARTH_SHELL_CMD to a
+// command that execs INTO that workspace's own container/microVM, so terminals
+// are OS-isolated. `{workspace}` is substituted with the (sanitized) workspace
+// id. Examples:
+//   docker:  HEARTH_SHELL_CMD="docker exec -it hearth-{workspace} bash"
+//   fly:     HEARTH_SHELL_CMD="flyctl ssh console -a {workspace} -C /bin/bash"
+//   k8s:     HEARTH_SHELL_CMD="kubectl exec -it hearth-{workspace} -- bash"
+function shellCommand(workspaceId: string): { file: string; args: string[] } {
+  const tmpl = process.env.HEARTH_SHELL_CMD;
+  if (tmpl && tmpl.trim()) {
+    const safeWs = workspaceId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const parts = tmpl.trim().split(/\s+/).map((p) => p.replace(/\{workspace\}/g, safeWs));
+    return { file: parts[0], args: parts.slice(1) };
+  }
+  const shell = process.env.SHELL ?? (process.platform === "win32" ? "cmd.exe" : "/bin/bash");
+  return { file: shell, args: [] };
+}
+
 function getOrCreateSession(sid: string): Session {
   const existing = sessions.get(sid);
   if (existing) {
@@ -34,8 +53,8 @@ function getOrCreateSession(sid: string): Session {
     return existing;
   }
 
-  const shell = process.env.SHELL ?? (process.platform === "win32" ? "cmd.exe" : "/bin/bash");
-  const ptyProcess = pty.spawn(shell, [], {
+  const { file, args } = shellCommand(workspaceOf(sid));
+  const ptyProcess = pty.spawn(file, args, {
     name: "xterm-256color",
     cols: 80,
     rows: 24,
