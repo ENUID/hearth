@@ -1,16 +1,17 @@
 # Hearth
 
-**Your computer in the cloud.** Open a browser on any device — even an $80 phone —
-and get a real Linux terminal plus open-source AI you can actually use. No powerful
-machine required.
+**A cloud terminal for open-source AI.** A real Linux terminal in your browser,
+built for genuinely running open-source models and agent CLIs — end to end, with
+no local setup.
 
 > An [ENUID Labs](https://github.com/ENUID) product. Built for people.
 
 ## The idea
 
-Most people don't own a machine strong enough to run modern AI or real dev tools.
-Hearth puts the computer in the cloud — your device is just the screen. Anyone, on
-anything, gets a real terminal and real open-source AI.
+Open-source AI is powerful but a pain to actually use — models to serve, agents to
+install, environments to wrangle. Hearth is a real terminal in the cloud where you
+just run it: pick a model, install an agent, go. Bring your own weights or keys;
+Hearth gives you the machine and the tools.
 
 ## What you get
 

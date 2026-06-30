@@ -6,7 +6,7 @@
 
 ## 1. Mission
 
-Remove the hardware requirement from computing. The computer lives in the cloud; the device is just a window. An $80 phone should be a full Linux workstation through the browser.
+A real cloud terminal where people genuinely run open-source AI — any model, any agent CLI — end to end, from the browser, with no local setup.
 
 ## 2. The shape of the product
 
