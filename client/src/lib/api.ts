@@ -28,6 +28,35 @@ export function tokenParam(): string {
   return t ? `&token=${encodeURIComponent(t)}` : "";
 }
 
+// --- active scope (personal "me" or "team:<id>") ---
+const SCOPE_KEY = "hearth_scope";
+export function getScope(): string {
+  try {
+    return localStorage.getItem(SCOPE_KEY) || "me";
+  } catch {
+    return "me";
+  }
+}
+export function setScope(scope: string): void {
+  try {
+    if (!scope || scope === "me") localStorage.removeItem(SCOPE_KEY);
+    else localStorage.setItem(SCOPE_KEY, scope);
+  } catch {
+    /* ignore */
+  }
+}
+/** `&scope=...` suffix for URLs (empty in personal scope). */
+export function scopeParam(): string {
+  const s = getScope();
+  return s && s !== "me" ? `&scope=${encodeURIComponent(s)}` : "";
+}
+/** Append the active scope to a request path as a query param. */
+function withScope(path: string): string {
+  const s = getScope();
+  if (!s || s === "me") return path;
+  return path + (path.includes("?") ? "&" : "?") + "scope=" + encodeURIComponent(s);
+}
+
 export async function getConfig(): Promise<{ authRequired: boolean; multiUser: boolean }> {
   const r = await fetch("/api/config");
   return r.json();
@@ -60,24 +89,34 @@ export async function getMe(): Promise<{ user: { username: string } | null }> {
   return r.json();
 }
 
+// --- teams ---
+export interface TeamMember { userId: string; username: string; role: "owner" | "member" }
+export interface Team { id: string; name: string; members: TeamMember[]; role?: "owner" | "member" }
+export const getTeams = (): Promise<{ teams: Team[] }> => authedJson("/api/teams");
+export const createTeam = (name: string): Promise<{ team: Team }> => authedJson("/api/teams", { method: "POST", body: { name } });
+export const addTeamMember = (id: string, username: string): Promise<{ team: Team }> =>
+  authedJson(`/api/teams/${encodeURIComponent(id)}/members`, { method: "POST", body: { username } });
+export const removeTeamMember = (id: string, userId: string): Promise<{ team: Team | null }> =>
+  authedJson(`/api/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, { method: "DELETE" });
+
 export function logout(): void {
   setToken(null);
 }
 
 export async function uploadFile(sid: string, file: File): Promise<{ ok?: boolean; path?: string; error?: string }> {
   const r = await fetch(
-    `/api/files/upload?sid=${encodeURIComponent(sid)}&name=${encodeURIComponent(file.name)}`,
+    `/api/files/upload?sid=${encodeURIComponent(sid)}&name=${encodeURIComponent(file.name)}${scopeParam()}`,
     { method: "POST", headers: authHeaders(), body: file }
   );
   return r.json();
 }
 
 export function downloadUrl(sid: string, path: string): string {
-  return `/api/files/download?sid=${encodeURIComponent(sid)}&path=${encodeURIComponent(path)}${tokenParam()}`;
+  return `/api/files/download?sid=${encodeURIComponent(sid)}&path=${encodeURIComponent(path)}${tokenParam()}${scopeParam()}`;
 }
 
 export async function killSession(sid: string): Promise<void> {
-  await fetch(`/api/session/kill?sid=${encodeURIComponent(sid)}`, {
+  await fetch(`/api/session/kill?sid=${encodeURIComponent(sid)}${scopeParam()}`, {
     method: "POST",
     headers: authHeaders(),
   }).catch(() => {});
@@ -88,7 +127,7 @@ export async function killSession(sid: string): Promise<void> {
 async function authedJson(path: string, opts: { method?: string; body?: unknown } = {}) {
   const headers: Record<string, string> = { ...authHeaders() };
   if (opts.body !== undefined) headers["content-type"] = "application/json";
-  const r = await fetch(path, {
+  const r = await fetch(withScope(path), {
     method: opts.method ?? "GET",
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,

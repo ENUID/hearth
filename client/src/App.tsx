@@ -7,9 +7,10 @@ import SettingsPanel from "./components/SettingsPanel";
 import ModelsPanel from "./components/ModelsPanel";
 import AgentsPanel from "./components/AgentsPanel";
 import Welcome from "./components/Welcome";
+import TeamsPanel from "./components/TeamsPanel";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
-import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession, getMe, logout } from "./lib/api";
+import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession, getMe, logout, getScope, setScope, getTeams, type Team } from "./lib/api";
 import { useSettings, setSettings } from "./lib/settings";
 
 type Mods = { ctrl: boolean; alt: boolean };
@@ -60,6 +61,23 @@ export default function App() {
     logout();
     window.location.reload();
   }, []);
+
+  // --- teams / scope (multi-user) ---
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamsOpen, setTeamsOpen] = useState(false);
+  const [scopeMenu, setScopeMenu] = useState(false);
+  const scope = getScope();
+  const loadTeams = useCallback(() => {
+    getTeams().then((r) => setTeams(r.teams)).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (multiUser && me) loadTeams();
+  }, [multiUser, me, loadTeams]);
+  const switchScope = useCallback((s: string) => {
+    setScope(s);
+    window.location.reload();
+  }, []);
+  const scopeLabel = scope === "me" ? "Personal" : teams.find((t) => `team:${t.id}` === scope)?.name ?? "Team";
 
   // --- workspaces (Phase 3) ---
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
@@ -261,6 +279,7 @@ export default function App() {
     { id: "models", title: "Run an open-source model", hint: "ai", run: () => setModelsOpen(true) },
     { id: "agents", title: "Install a CLI agent (Claude Code, Aider…)", hint: "ai", run: () => setAgentsOpen(true) },
     { id: "machine", title: "Machine: size, GPU, usage", hint: "machine", run: () => setMachineOpen(true) },
+    ...(multiUser ? [{ id: "teams", title: "Teams: shared workspaces", hint: "teams", run: () => setTeamsOpen(true) }] : []),
     { id: "welcome", title: "Show welcome / quick start", hint: "app", run: () => setWelcomeOpen(true) },
     { id: "settings", title: "Settings", hint: "app", run: () => setSettingsOpen(true) },
     { id: "theme", title: `Theme: ${settings.theme} → next`, hint: "app", run: cycleTheme },
@@ -277,6 +296,29 @@ export default function App() {
     <div ref={rootRef} style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <div style={headerStyle}>
         <span style={{ fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em", fontFamily: "var(--font-mono)", fontSize: 13 }}>hearth</span>
+
+        {/* scope switcher (personal / team) */}
+        {multiUser && (
+          <div style={{ position: "relative", marginLeft: 8 }}>
+            <button onClick={() => setScopeMenu((o) => !o)} title="scope" style={{ ...ghostBtn, display: "flex", gap: 5, alignItems: "center" }}>
+              <span style={{ fontSize: 9, color: scope === "me" ? "var(--fg-subtle)" : "var(--accent)" }}>{scope === "me" ? "◐" : "◆"}</span>
+              <span style={{ color: "var(--fg)" }}>{scopeLabel}</span>
+              <span style={{ color: "var(--fg-subtle)", fontSize: 10 }}>▾</span>
+            </button>
+            {scopeMenu && (
+              <>
+                <div onClick={() => setScopeMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                <div style={wsMenuStyle} className="hearth-fade">
+                  <button onClick={() => switchScope("me")} style={{ ...wsItem, color: scope === "me" ? "var(--fg)" : "var(--fg-muted)", background: scope === "me" ? "var(--accent-soft)" : "transparent" }}>Personal</button>
+                  {teams.map((t) => (
+                    <button key={t.id} onClick={() => switchScope(`team:${t.id}`)} style={{ ...wsItem, color: scope === `team:${t.id}` ? "var(--fg)" : "var(--fg-muted)", background: scope === `team:${t.id}` ? "var(--accent-soft)" : "transparent" }}>{t.name}</button>
+                  ))}
+                  <button onClick={() => { setScopeMenu(false); setTeamsOpen(true); }} style={{ ...wsItem, color: "var(--fg-muted)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>⚙ manage teams…</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* workspace switcher */}
         <div style={{ position: "relative", marginLeft: 8 }}>
@@ -387,6 +429,7 @@ export default function App() {
           onOpenAgents={() => setAgentsOpen(true)}
         />
       )}
+      {teamsOpen && <TeamsPanel me={me} onClose={() => setTeamsOpen(false)} onSwitchScope={switchScope} />}
     </div>
   );
 }
