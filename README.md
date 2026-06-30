@@ -1,155 +1,83 @@
 # Hearth
 
-**A universal web terminal.** Open a browser on any device — a $80 phone, a borrowed laptop, a library PC — and get a real, full Linux terminal running in the cloud. Everything a terminal can do, you do from the web.
+**Your computer in the cloud.** Open a browser on any device — even an $80 phone —
+and get a real Linux terminal plus open-source AI you can actually use. No powerful
+machine required.
 
-> An [ENUID Labs](https://github.com/ENUID) product. Build for people.
+> An [ENUID Labs](https://github.com/ENUID) product. Built for people.
 
----
+## The idea
 
-## Why
+Most people don't own a machine strong enough to run modern AI or real dev tools.
+Hearth puts the computer in the cloud — your device is just the screen. Anyone, on
+anything, gets a real terminal and real open-source AI.
 
-There are ~6.8 billion smartphone users but only ~2 billion personal computers. Real computing — development, command-line tools, AI CLIs — assumes you own a capable machine. That assumption excludes most of humanity.
+## What you get
 
-Hearth removes the hardware requirement. The computer lives in the cloud; your device is just a window to it.
+- **A real terminal** — a full Linux shell on a machine that persists. Install
+  anything (`pip`, `npm`, `apt`), run editors and TUIs, keep your home directory.
+  Works on a phone (installable PWA + on-screen keys, tabs, file upload/download,
+  reconnect).
+- **Open-source AI, one tap** — run Llama, Qwen, Mistral, Gemma, DeepSeek and more.
+  Small models run **free on your device** (WebGPU); bigger ones run on a **cloud
+  GPU**. Chat in the panel or hit the **OpenAI-compatible API**. Image / audio /
+  video models too.
+- **AI agents, one tap** — install Claude Code, Aider, Codex, goose… already wired
+  to your model (or your own provider key).
+- **Bring your own AI** — Hearth hosts no models of its own. You run open weights,
+  or use your own API keys — exactly like on a real computer.
+- **Multi-user & secure** — public sign-up, an isolated machine per user, teams,
+  rate limiting, token revocation. See **[SECURITY.md](./SECURITY.md)**.
 
-## What Hearth is (and isn't)
-
-Hearth is **just the terminal** — the best, most complete web terminal we can build, backed by a real persistent Linux machine. That's the whole product.
-
-It is **not** an AI app, a chat tool, or a curated bundle. It doesn't ship models, agents, or opinions about what you should run. Whatever you want — any LLM CLI, any API, any language, any tool — you install it and pay for it yourself, exactly like you would on your own computer:
-
-```bash
-$ pip install aider-chat        # bring any AI CLI you like
-$ npm i -g @anthropic-ai/claude-code
-$ curl https://api.openai.com/… # use any API with your own key
-$ ollama run llama3             # run a model yourself
-$ git clone … && cargo build    # or just… do normal computer things
-```
-
-Hearth gives you the computer and the terminal. What runs on it is entirely yours. You get `sudo`, the usual package managers, and a home directory that persists — so installing AI agents/CLIs (and their API keys) works just like on a real machine. See **[docs/installing-tools.md](docs/installing-tools.md)** for copy-paste recipes (aider, Claude Code, Gemini CLI, ollama, …).
-
-## Principles
-
-- **Just the terminal.** A real shell on a real Linux box. Nothing bundled, nothing in the way.
-- **Maximally capable.** Whatever a Linux terminal can do — interactive programs, colors, editors, long-running processes, package installs — works here.
-- **Device-agnostic, web-first.** Runs in any modern browser as an installable PWA.
-- **Yours.** Persistent filesystem, your tools, your keys, your bill. We don't sit between you and what you run.
-
-## Features
-
-- **Run open-source models in one tap** — pick a model (Llama, Qwen, Mistral, Gemma, DeepSeek…); Hearth rents the GPU, serves it, and gives you a **chat UI + an OpenAI-compatible API endpoint**. The terminal is the power layer underneath.
-
-A complete terminal, not a demo:
-
-- **Full terminal emulation** — 24-bit truecolor, Unicode/emoji/CJK, full-screen TUIs (vim, htop, less), mouse, job control (Ctrl-C/Z/D), 10k scrollback, clickable links, bell.
-- **Copy / paste / search** — Ctrl+Shift+C/V, OSC-52 programmatic clipboard, in-terminal search (Ctrl+Shift+F).
-- **GPU rendering** — WebGL renderer with automatic fallback.
-- **Multiple tabs** — independent concurrent sessions, persisted across reloads.
-- **File upload / download** — buttons + drag-and-drop, relative to the shell's live working directory.
-- **Reconnect & persistence** — scrollback replays on reconnect and survives a server restart; the home directory persists.
-- **Auth** — optional password login (JWT), off by default for local dev.
-- **Mobile** — on-screen key bar (Esc/Tab/Ctrl/Alt/arrows), installable PWA.
-- **Machine control (Phase 2)** — resize CPU/RAM tiers, provision/release a GPU on demand, scale-to-zero when idle (wake on use), live usage metering and cost, optional Stripe billing. Pluggable backends: local (dev), Docker, Kubernetes.
-
-## What's in this repo
-
-| Path | What it is |
-|------|-----------|
-| `client/` | React 19 + Vite PWA: xterm.js terminal, tabs, file transfer, login. |
-| `server/` | Node.js bridge: WebSocket ⇄ PTY, persistence, auth, file endpoints. |
-| `docker/` | The container image (a capable Linux workspace) and Compose setup. |
-| `deploy/k8s/` | Kubernetes manifests for production (control plane + GPU nodes). |
-| `docs/hearth-spec.md` | Full technical spec. |
-| `docs/installing-tools.md` | How to install AI agents/CLIs and persist keys. |
-| `docs/running-ai-clis.md` | Step-by-step: Claude Code, bigger models, GPU, APIs. |
-
-## Run it
-
-### Fastest: GitHub Codespaces (works on a phone/iPad)
-
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ENUID/hearth)
-
-Open **https://codespaces.new/ENUID/hearth** (signed in to GitHub). The devcontainer
-installs, builds, and starts Hearth automatically on port **8080** and forwards it —
-the preview URL (`https://…-8080.app.github.dev`) opens in your browser, including on
-iPad. No local setup. (Private repo → uses your Codespaces quota.)
-
-**Live preview that auto-updates on every push** — in the Codespace terminal:
+## Run it locally
 
 ```bash
-npm run autopreview
-```
-
-This builds, serves on port 8080, and then watches the repo: whenever new commits
-are pushed it auto-pulls, rebuilds, and restarts — just refresh the tab to see
-changes. To expose it publicly (Ports tab → Port Visibility → Public), set a
-password first:
-
-```bash
-HEARTH_REQUIRE_AUTH=true HEARTH_PASSWORD=secret HEARTH_JWT_SECRET=$(openssl rand -hex 16) npm run autopreview
-```
-
-### Local
-
-```bash
-# install deps for both packages
 npm install && npm run install:all
-
-# dev mode (client + terminal bridge with live reload)
-npm run dev
-# client →  http://localhost:5173
-# bridge →  ws://localhost:3001/pty
+npm run dev          # client → http://localhost:5173 · bridge → :3001
 ```
 
-For the full containerized experience (terminal + persistent Linux workspace):
+Or the full containerized version (terminal + persistent Linux box):
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-### Deploy for the public — Fly.io (a microVM per user)
+## Make it public (Fly.io)
 
-Hearth is a long-lived WebSocket/PTY server, and a terminal is code execution —
-so it needs a **container host that gives each user their own isolated machine**,
-not a serverless platform (Vercel/Netlify can't hold the WebSocket, and Render
-can't isolate strangers). **Fly.io** is the one target: it gives every workspace
-its own persistent, OS-isolated Firecracker **microVM**.
+A terminal is code execution, so each user needs their own isolated machine. Fly.io
+gives every workspace its own Firecracker **microVM** (a serverless host can't do
+this). `fly.toml` is preconfigured for multi-user + a machine per workspace.
 
 ```bash
-fly launch --no-deploy        # creates the app (pick a name + region)
+fly launch --no-deploy
 fly secrets set HEARTH_JWT_SECRET=$(openssl rand -hex 32) FLY_API_TOKEN=$(fly auth token)
 fly volumes create hearth_state --size 3
-fly deploy                    # uses fly.toml
+fly deploy
 ```
 
-`fly.toml` ships with `HEARTH_MULTIUSER=true` (anyone signs up / signs in to
-their own isolated workspaces + teams), `HEARTH_PROVIDER=fly` (a machine per
-workspace), and `HEARTH_SHELL_CMD` (the terminal execs *inside* that machine).
-**Read [SECURITY.md](./SECURITY.md) first** — it's the threat model and the full
-operator checklist (resource caps, egress, TLS, backups, closing signups).
-
-> Just hacking on it yourself? `docker compose -f docker/docker-compose.yml up`
-> (see `.env.example`) runs the whole thing locally on one machine.
+For **real cloud AI** (so weak-device users get genuine inference), point
+`OLLAMA_HOST` at an ollama server running on a GPU (a Fly GPU machine or RunPod).
+**Read [SECURITY.md](./SECURITY.md) before opening it to the public.**
 
 ## Status
 
-🚧 Early development — **Phase 1** is functional end-to-end: browser terminal → WebSocket → persistent Linux container, with tabs, file transfer, auth, and reconnect/persistence. Real shell, real filesystem, install anything.
+Built and verified: the terminal, accounts + per-user isolation, on-device AI,
+agents, and the cloud (ollama) serving path. The only things left to actually
+launch are a GPU running ollama and your Fly account.
 
-### Roadmap
+## What's in the repo
 
-- **Phase 1** ✅ — A real, fully-capable cloud terminal from any device.
-- **Phase 2** ✅ (control plane) — Resize CPU/RAM/GPU on demand, scale-to-zero, metering + billing. Local backend is built and tested; Docker/Kubernetes/Stripe are real adapters that activate with the matching environment/credentials.
-- **Phase 3** ✅ — Multiple workspaces (each its own machine, tabs, and home);
-  multi-user accounts with per-user isolation; teams with shared workspaces +
-  roles; one-command self-host with instance/org settings. Open-model runner is
-  multi-modal (chat · image · audio · video); chat runs on-device or cloud,
-  other modalities provision a GPU (per-modality serving stack is
-  deploy-configured).
+| Path | What it is |
+|------|-----------|
+| `client/` | React 19 + Vite PWA — terminal, models/agents panels, login. |
+| `server/` | Node bridge — WebSocket ⇄ PTY, accounts, control plane, model runners. |
+| `docker/`, `fly.toml` | Local container + Fly deploy. |
+| `docs/`, `SECURITY.md` | Guides, spec, and the security/threat model. |
 
 ## Tech
 
-React 19 + Vite (PWA) · xterm.js · WebSocket · node-pty · Docker → Firecracker/gVisor.
+React 19 + Vite (PWA) · xterm.js · WebSocket · node-pty · Fly machines / Docker / Kubernetes.
 
 ---
 
-*Part of ENUID — an AI lab building intelligence that works rather than merely performs.*
+*Part of ENUID — building intelligence that works rather than merely performs.*
