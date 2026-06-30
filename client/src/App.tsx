@@ -10,7 +10,7 @@ import Welcome from "./components/Welcome";
 import TeamsPanel from "./components/TeamsPanel";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
-import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession, getMe, logout, getScope, setScope, getTeams, type Team } from "./lib/api";
+import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession, getMe, logout, getScope, setScope, getTeams, signOutEverywhere, changePassword, type Team } from "./lib/api";
 import { useSettings, setSettings } from "./lib/settings";
 
 type Mods = { ctrl: boolean; alt: boolean };
@@ -62,6 +62,25 @@ export default function App() {
   const signOut = useCallback(() => {
     logout();
     window.location.reload();
+  }, []);
+  const [acctMenu, setAcctMenu] = useState(false);
+  const signOutAll = useCallback(async () => {
+    await signOutEverywhere().catch(() => {});
+    logout();
+    window.location.reload();
+  }, []);
+  const doChangePassword = useCallback(async () => {
+    setAcctMenu(false);
+    const current = window.prompt("Current password");
+    if (!current) return;
+    const next = window.prompt("New password (6+ characters)");
+    if (!next) return;
+    try {
+      await changePassword(current, next);
+      window.alert("Password changed. Other devices have been signed out.");
+    } catch (e) {
+      window.alert((e as Error).message);
+    }
   }, []);
 
   // --- teams / scope (multi-user) ---
@@ -390,10 +409,22 @@ export default function App() {
           <GearIcon />
         </button>
         {multiUser && me && (
-          <button onClick={signOut} title={`signed in as ${me} — sign out`} style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 18, height: 18, borderRadius: 999, background: "var(--accent-soft)", color: "var(--fg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{me.slice(0, 1)}</span>
-            <span style={{ color: "var(--fg-muted)" }}>sign out</span>
-          </button>
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setAcctMenu((o) => !o)} title={`signed in as ${me}`} style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 18, height: 18, borderRadius: 999, background: "var(--accent-soft)", color: "var(--fg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{me.slice(0, 1)}</span>
+              <span style={{ color: "var(--fg-muted)" }}>{me}</span>
+            </button>
+            {acctMenu && (
+              <>
+                <div onClick={() => setAcctMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                <div style={{ ...wsMenuStyle, left: "auto", right: 0, minWidth: 190 }} className="hearth-fade">
+                  <button onClick={doChangePassword} style={{ ...wsItem, color: "var(--fg-muted)" }}>Change password…</button>
+                  <button onClick={() => { setAcctMenu(false); signOutAll(); }} style={{ ...wsItem, color: "var(--fg-muted)" }}>Sign out everywhere</button>
+                  <button onClick={signOut} style={{ ...wsItem, color: "var(--fg)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>Sign out</button>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { if (e.target.files?.length) uploadFiles(e.target.files); e.target.value = ""; }} />

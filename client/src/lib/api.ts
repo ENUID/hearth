@@ -103,6 +103,13 @@ export function logout(): void {
   setToken(null);
 }
 
+export const signOutEverywhere = (): Promise<{ ok: boolean }> => authedJson("/api/account/signout-all", { method: "POST" });
+
+export async function changePassword(current: string, next: string): Promise<void> {
+  const j = (await authedJson("/api/account/password", { method: "POST", body: { current, next } })) as { token?: string };
+  if (j.token) setToken(j.token); // stay signed in on this device with a fresh token
+}
+
 export async function uploadFile(sid: string, file: File): Promise<{ ok?: boolean; path?: string; error?: string }> {
   const r = await fetch(
     `/api/files/upload?sid=${encodeURIComponent(sid)}&name=${encodeURIComponent(file.name)}${scopeParam()}`,
