@@ -2,22 +2,40 @@
 # auto-redeploys on every push to the default branch.
 #
 # Use: render.com → New → Blueprint → pick this repo. Render builds ./Dockerfile,
-# serves on its $PORT, and gives you https://<name>.onrender.com.
+# serves on its $PORT over HTTPS, and gives you https://<name>.onrender.com.
+# Render runs long-lived services and supports WebSockets, so the terminal works
+# here (unlike serverless platforms).
 #
 # Auth is ON: a random password is generated — read it in the Render dashboard
 # under the service's Environment tab (HEARTH_PASSWORD) and use it to sign in.
+#
+# NOTE: a terminal needs an always-on server + durable state, so this uses a
+# paid plan with a persistent disk. The free plan spins down on idle (which
+# drops live terminals) and can't mount a disk. For UNTRUSTED multi-user, Render
+# hosts the bridge fine, but it has no per-workspace container API — set
+# HEARTH_PROVIDER=fly so each workspace is its own Fly microVM. See SECURITY.md.
 services:
   - type: web
     name: hearth
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: free
+    plan: starter
     autoDeploy: true
     healthCheckPath: /health
+    # Durable state (session scrollback, accounts, teams) survives redeploys.
+    disk:
+      name: hearth-state
+      mountPath: /data
+      sizeGB: 3
     envVars:
+      - key: HEARTH_STATE_DIR
+        value: /data/sessions
       - key: HEARTH_REQUIRE_AUTH
         value: "true"
       - key: HEARTH_PASSWORD
         generateValue: true
       - key: HEARTH_JWT_SECRET
         generateValue: true
+      # For multi-user accounts + teams instead of a shared password, set:
+      # - key: HEARTH_MULTIUSER
+      #   value: "true"
