@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { getModels, startModel, stopModel, modelChat, type ModelsSnapshot, type ModelInfo } from "../lib/api";
+import { getModels, startModel, stopModel, modelChat, generateImage, type ModelsSnapshot, type ModelInfo } from "../lib/api";
 import { canRunLocally, webgpuAvailable, LocalEngine, type LocalChatMsg } from "../lib/local-llm";
 
 type ChatMsg = { role: "user" | "assistant"; content: string; streaming?: boolean };
@@ -20,6 +20,9 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [local, setLocal] = useState<Local | null>(null);
+  const [imgPrompt, setImgPrompt] = useState("");
+  const [img, setImg] = useState<{ url: string; backend: string; note?: string } | null>(null);
+  const [imgBusy, setImgBusy] = useState(false);
   const localRef = useRef<Local | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   localRef.current = local;
@@ -72,6 +75,21 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
       setMsg((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function genImage(e: FormEvent) {
+    e.preventDefault();
+    const prompt = imgPrompt.trim();
+    if (!prompt || imgBusy) return;
+    setImgBusy(true);
+    setMsg("");
+    try {
+      setImg(await generateImage(prompt, ws));
+    } catch (err) {
+      setMsg((err as Error).message);
+    } finally {
+      setImgBusy(false);
     }
   }
 
@@ -256,6 +274,22 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
                 <button type="submit" disabled={!chatEnabled || busy || !input.trim()} style={{ ...runBtn, width: "auto", padding: "8px 12px", opacity: !chatEnabled || busy || !input.trim() ? 0.4 : 1 }}>Send</button>
               </form>
             </>
+          ) : runningCat === "image" ? (
+            <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+              {img ? (
+                <>
+                  <img src={img.url} alt="generated" style={{ width: "100%", borderRadius: "var(--radius)", border: "1px solid var(--border)" }} />
+                  <div style={{ fontSize: 10, color: "var(--fg-subtle)" }}>backend: {img.backend}{img.note ? ` · ${img.note}` : ""}</div>
+                </>
+              ) : (
+                <div style={{ color: "var(--fg-subtle)", fontSize: 13 }}>Describe an image, then Generate. Also available as <code style={{ fontFamily: "var(--font-mono)" }}>POST /v1/images/generations</code>.</div>
+              )}
+              <form onSubmit={genImage} style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+                <input value={imgPrompt} onChange={(e) => setImgPrompt(e.target.value)} placeholder="a fox in a snowy forest…" disabled={imgBusy}
+                  style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--fg)", padding: "8px 10px", fontSize: 13, outline: "none" }} />
+                <button type="submit" disabled={imgBusy || !imgPrompt.trim()} style={{ ...runBtn, width: "auto", padding: "8px 12px", opacity: imgBusy || !imgPrompt.trim() ? 0.4 : 1 }}>{imgBusy ? "…" : "Generate"}</button>
+              </form>
+            </div>
           ) : (
             <div style={{ flex: 1, overflowY: "auto", padding: 16, color: "var(--fg-muted)", fontSize: 13, lineHeight: 1.6 }}>
               <b style={{ color: "var(--fg)" }}>{cloud!.name}</b> is provisioned. {cloud!.name} produces{" "}

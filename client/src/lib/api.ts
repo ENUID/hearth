@@ -184,6 +184,18 @@ export function modelChat(messages: { role: string; content: string }[], ws = "w
     body: JSON.stringify({ ws, messages, stream: true }),
   });
 }
+/** Generate an image with the workspace's running image model. Returns a data URL. */
+export async function generateImage(prompt: string, ws = "workspace"): Promise<{ url: string; backend: string; note?: string }> {
+  const r = await fetch(withScope(`/api/models/v1/images/generations?ws=${W(ws)}`), {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ prompt, ws }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `error ${r.status}`);
+  const j = (await r.json()) as { backend: string; note?: string; data: { b64_json: string }[] };
+  return { url: `data:image/png;base64,${j.data[0].b64_json}`, backend: j.backend, note: j.note };
+}
+
 export const chargeNow = (): Promise<{ invoice: { totalCents: number }; result: { status: string; provider: string; amountCents: number } }> =>
   authedJson("/api/billing/charge", { method: "POST" });
 

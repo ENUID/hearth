@@ -2,6 +2,7 @@ import { Readable } from "stream";
 import type { Express, Request, Response } from "express";
 import { MODEL_CATALOG, findModel } from "./catalog";
 import { modelManager } from "./manager";
+import { imageRunner } from "./image";
 import { scopeId } from "../auth";
 
 type AuthFn = (req: Request) => boolean;
@@ -95,5 +96,24 @@ export function mountModels(app: Express, isAuthed: AuthFn): void {
     res.setHeader("content-type", "text/event-stream");
     res.setHeader("cache-control", "no-cache");
     Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+  }));
+
+  // OpenAI-compatible image generation against the workspace's running image
+  // model. POST /api/models/v1/images/generations { prompt }
+  app.post("/api/models/v1/images/generations", guard(async (req, res) => {
+    const ws = wsId(req);
+    const running = modelManager.get(ws);
+    if (!running || running.status !== "running") {
+      res.status(409).json({ error: "no model is running for this workspace" });
+      return;
+    }
+    const model = findModel(running.modelId);
+    if (!model || model.category !== "image") {
+      res.status(400).json({ error: "the running model is not an image model" });
+      return;
+    }
+    const prompt = String(req.body?.prompt ?? "");
+    const out = await imageRunner.generate(prompt, running.modelId);
+    res.json({ created: Math.floor(Date.now() / 1000), backend: imageRunner.name, data: [{ b64_json: out.b64 }], note: out.note });
   }));
 }
