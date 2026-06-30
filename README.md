@@ -107,56 +107,29 @@ For the full containerized experience (terminal + persistent Linux workspace):
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-### Deploy a permanent public URL (auto-updates on every push)
+### Deploy for the public — Fly.io (a microVM per user)
 
-Hearth is a long-lived WebSocket/PTY server, so it needs a **container host** —
-not a serverless platform like Vercel/Netlify (those can't run the terminal
-backend). The repo ships a production `Dockerfile` (builds client + server,
-serves on one port) and a Render blueprint:
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/ENUID/hearth)
-
-**Render** (easiest): New → Blueprint → pick this repo. It builds `./Dockerfile`,
-gives you `https://<name>.onrender.com`, and **auto-redeploys on every push**.
-Auth is on by default — the generated password is in the service's *Environment*
-tab (`HEARTH_PASSWORD`). Works on **Fly.io / Railway** too (same `Dockerfile`).
-
-To require a password, set `HEARTH_REQUIRE_AUTH=true`, `HEARTH_PASSWORD`, and `HEARTH_JWT_SECRET` (see `.env.example`).
-
-### Self-host with multi-user accounts + teams
-
-One command, persistent state, your own instance:
+Hearth is a long-lived WebSocket/PTY server, and a terminal is code execution —
+so it needs a **container host that gives each user their own isolated machine**,
+not a serverless platform (Vercel/Netlify can't hold the WebSocket, and Render
+can't isolate strangers). **Fly.io** is the one target: it gives every workspace
+its own persistent, OS-isolated Firecracker **microVM**.
 
 ```bash
-cp .env.example .env          # set HEARTH_MULTIUSER=true and a HEARTH_JWT_SECRET
-docker compose -f docker/docker-compose.yml up -d --build
-```
-
-- **`HEARTH_MULTIUSER=true`** — each person signs up / signs in and gets their
-  own isolated workspaces, terminals, and machines. **Teams** share workspaces
-  (switch scope in the header). Accounts and teams persist on the volume.
-- **`HEARTH_INSTANCE_NAME`** — the name shown on the login screen.
-- **`HEARTH_SIGNUPS_OPEN=false`** — close new signups once your team is set up
-  (the first account is always allowed, so you can bootstrap an admin).
-
-Single shared password instead? Set `HEARTH_REQUIRE_AUTH=true` + `HEARTH_PASSWORD`.
-
-### Untrusted / public users → a microVM per workspace (Fly.io)
-
-A terminal is code execution, so strangers must never share a host. The ships-
-with **Fly.io** path gives each workspace its own Firecracker **microVM**
-(persistent + OS-isolated — the thing serverless platforms like Vercel can't do):
-
-```bash
-fly launch --no-deploy
+fly launch --no-deploy        # creates the app (pick a name + region)
 fly secrets set HEARTH_JWT_SECRET=$(openssl rand -hex 32) FLY_API_TOKEN=$(fly auth token)
 fly volumes create hearth_state --size 3
-fly deploy        # uses fly.toml (HEARTH_PROVIDER=fly + HEARTH_SHELL_CMD)
+fly deploy                    # uses fly.toml
 ```
 
-`HEARTH_PROVIDER=fly` provisions a machine per workspace; `HEARTH_SHELL_CMD`
-makes the terminal exec *inside* it. Read **[SECURITY.md](./SECURITY.md)** first —
-it's the threat model and the full operator checklist (caps, egress, TLS, backups).
+`fly.toml` ships with `HEARTH_MULTIUSER=true` (anyone signs up / signs in to
+their own isolated workspaces + teams), `HEARTH_PROVIDER=fly` (a machine per
+workspace), and `HEARTH_SHELL_CMD` (the terminal execs *inside* that machine).
+**Read [SECURITY.md](./SECURITY.md) first** — it's the threat model and the full
+operator checklist (resource caps, egress, TLS, backups, closing signups).
+
+> Just hacking on it yourself? `docker compose -f docker/docker-compose.yml up`
+> (see `.env.example`) runs the whole thing locally on one machine.
 
 ## Status
 
