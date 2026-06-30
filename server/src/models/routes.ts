@@ -3,6 +3,7 @@ import type { Express, Request, Response } from "express";
 import { MODEL_CATALOG, findModel } from "./catalog";
 import { modelManager } from "./manager";
 import { imageRunner } from "./image";
+import { audioRunner, isGenerativeAudio } from "./audio";
 import { scopeId } from "../auth";
 
 type AuthFn = (req: Request) => boolean;
@@ -115,5 +116,27 @@ export function mountModels(app: Express, isAuthed: AuthFn): void {
     const prompt = String(req.body?.prompt ?? "");
     const out = await imageRunner.generate(prompt, running.modelId);
     res.json({ created: Math.floor(Date.now() / 1000), backend: imageRunner.name, data: [{ b64_json: out.b64 }], note: out.note });
+  }));
+
+  // OpenAI-compatible text-to-speech against the workspace's running audio model.
+  // POST /api/models/v1/audio/speech { input } → raw audio bytes.
+  app.post("/api/models/v1/audio/speech", guard(async (req, res) => {
+    const ws = wsId(req);
+    const running = modelManager.get(ws);
+    if (!running || running.status !== "running") {
+      res.status(409).json({ error: "no model is running for this workspace" });
+      return;
+    }
+    const model = findModel(running.modelId);
+    if (!model || model.category !== "audio" || !isGenerativeAudio(running.modelId)) {
+      res.status(400).json({ error: "the running model is not a text-to-audio model" });
+      return;
+    }
+    const input = String(req.body?.input ?? req.body?.prompt ?? "");
+    const out = await audioRunner.speak(input, running.modelId);
+    res.setHeader("content-type", out.contentType);
+    // Header values must be ASCII — strip anything else defensively.
+    if (out.note) res.setHeader("x-hearth-note", out.note.replace(/[^\x20-\x7E]/g, ""));
+    res.send(out.buf);
   }));
 }

@@ -37,6 +37,11 @@ class ModelManager {
     const model = findModel(modelId);
     if (!model) throw new Error(`unknown model: ${modelId}`);
 
+    // Switching models: release the previous one (and its GPU) first, so we
+    // don't double-provision a GPU for the workspace.
+    const prev = this.running.get(ws);
+    if (prev && prev.status !== "stopped") await this.stop(ws).catch(() => {});
+
     const rec: RunningModel = {
       workspace: ws,
       modelId,

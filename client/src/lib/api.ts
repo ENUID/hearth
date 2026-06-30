@@ -203,6 +203,19 @@ export async function generateImage(prompt: string, ws = "workspace"): Promise<{
   return { url: `data:image/png;base64,${j.data[0].b64_json}`, backend: j.backend, note: j.note };
 }
 
+/** Text-to-speech with the workspace's running audio model. Returns a playable object URL. */
+export async function generateSpeech(input: string, ws = "workspace"): Promise<{ url: string; note?: string }> {
+  const r = await fetch(withScope(`/api/models/v1/audio/speech?ws=${W(ws)}`), {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ input, ws }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `error ${r.status}`);
+  const note = r.headers.get("x-hearth-note") ?? undefined;
+  const blob = await r.blob();
+  return { url: URL.createObjectURL(blob), note };
+}
+
 export const chargeNow = (): Promise<{ invoice: { totalCents: number }; result: { status: string; provider: string; amountCents: number } }> =>
   authedJson("/api/billing/charge", { method: "POST" });
 

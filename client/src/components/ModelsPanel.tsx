@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { getModels, startModel, stopModel, modelChat, generateImage, type ModelsSnapshot, type ModelInfo } from "../lib/api";
+import { getModels, startModel, stopModel, modelChat, generateImage, generateSpeech, type ModelsSnapshot, type ModelInfo } from "../lib/api";
 import { canRunLocally, webgpuAvailable, LocalEngine, type LocalChatMsg } from "../lib/local-llm";
 
 type ChatMsg = { role: "user" | "assistant"; content: string; streaming?: boolean };
@@ -23,6 +23,9 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
   const [imgPrompt, setImgPrompt] = useState("");
   const [img, setImg] = useState<{ url: string; backend: string; note?: string } | null>(null);
   const [imgBusy, setImgBusy] = useState(false);
+  const [audPrompt, setAudPrompt] = useState("");
+  const [aud, setAud] = useState<{ url: string; note?: string } | null>(null);
+  const [audBusy, setAudBusy] = useState(false);
   const localRef = useRef<Local | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   localRef.current = local;
@@ -90,6 +93,21 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
       setMsg((err as Error).message);
     } finally {
       setImgBusy(false);
+    }
+  }
+
+  async function genSpeech(e: FormEvent) {
+    e.preventDefault();
+    const input = audPrompt.trim();
+    if (!input || audBusy) return;
+    setAudBusy(true);
+    setMsg("");
+    try {
+      setAud(await generateSpeech(input, ws));
+    } catch (err) {
+      setMsg((err as Error).message);
+    } finally {
+      setAudBusy(false);
     }
   }
 
@@ -288,6 +306,22 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
                 <input value={imgPrompt} onChange={(e) => setImgPrompt(e.target.value)} placeholder="a fox in a snowy forest…" disabled={imgBusy}
                   style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--fg)", padding: "8px 10px", fontSize: 13, outline: "none" }} />
                 <button type="submit" disabled={imgBusy || !imgPrompt.trim()} style={{ ...runBtn, width: "auto", padding: "8px 12px", opacity: imgBusy || !imgPrompt.trim() ? 0.4 : 1 }}>{imgBusy ? "…" : "Generate"}</button>
+              </form>
+            </div>
+          ) : runningCat === "audio" && !/whisper/i.test(cloud!.modelId) ? (
+            <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+              {aud ? (
+                <>
+                  <audio src={aud.url} controls style={{ width: "100%" }} />
+                  {aud.note && <div style={{ fontSize: 10, color: "var(--fg-subtle)" }}>{aud.note}</div>}
+                </>
+              ) : (
+                <div style={{ color: "var(--fg-subtle)", fontSize: 13 }}>Type text (or a music prompt), then Generate. Also <code style={{ fontFamily: "var(--font-mono)" }}>POST /v1/audio/speech</code>.</div>
+              )}
+              <form onSubmit={genSpeech} style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+                <input value={audPrompt} onChange={(e) => setAudPrompt(e.target.value)} placeholder="hello from hearth…" disabled={audBusy}
+                  style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--fg)", padding: "8px 10px", fontSize: 13, outline: "none" }} />
+                <button type="submit" disabled={audBusy || !audPrompt.trim()} style={{ ...runBtn, width: "auto", padding: "8px 12px", opacity: audBusy || !audPrompt.trim() ? 0.4 : 1 }}>{audBusy ? "…" : "Generate"}</button>
               </form>
             </div>
           ) : (
