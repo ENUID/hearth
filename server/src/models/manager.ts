@@ -59,7 +59,9 @@ class ModelManager {
       } else {
         await controlPlane.provisionGpu(ws, model.gpu); // rent the GPU
       }
-      await this.runner.start(modelId);
+      // Only chat models go through the chat runner (ollama). Image/audio/video
+      // are served by their own runners at generation time.
+      if (model.category === "chat") await this.runner.start(modelId);
       rec.status = "running";
       rec.startedAt = Date.now();
     } catch (e) {
@@ -74,7 +76,7 @@ class ModelManager {
     const rec = this.running.get(ws);
     if (!rec) return null;
     try {
-      await this.runner.stop(rec.modelId);
+      if (findModel(rec.modelId)?.category === "chat") await this.runner.stop(rec.modelId);
       if (rec.gpu) await controlPlane.releaseGpu(ws); // stop GPU billing
     } catch {
       /* best effort */
