@@ -6,6 +6,12 @@ type ChatMsg = { role: "user" | "assistant"; content: string; streaming?: boolea
 type Local = { model: ModelInfo; engine: LocalEngine; status: "loading" | "ready" | "error"; pct: number; note: string };
 
 const gpuBadge: Record<string, string> = { cpu: "CPU", a10g: "A10G", a100: "A100" };
+const CATEGORIES: { key: ModelInfo["category"]; label: string }[] = [
+  { key: "chat", label: "Chat / LLM" },
+  { key: "image", label: "Image" },
+  { key: "audio", label: "Audio · speech · music" },
+  { key: "video", label: "Video" },
+];
 
 export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () => void }) {
   const [snap, setSnap] = useState<ModelsSnapshot | null>(null);
@@ -131,7 +137,9 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
 
   const endpoint = snap ? `${location.origin}${snap.apiPath}` : "";
   const localReady = local?.status === "ready";
-  const chatEnabled = localReady || (!local && cloud?.status === "running");
+  const runningCat = local ? "chat" : snap?.catalog.find((m) => m.id === cloud?.modelId)?.category ?? "chat";
+  const isChat = runningCat === "chat";
+  const chatEnabled = isChat && (localReady || (!local && cloud?.status === "running"));
 
   return (
     <div style={panel}>
@@ -148,27 +156,36 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
       ) : !running ? (
         <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 2 }}>
-            Hearth runs the model on <b>your device</b> when it can (free + private), and rents a GPU only when it must.
+            Hearth runs chat models on <b>your device</b> when it can (free + private), and rents a GPU
+            only when it must. Image / audio / video serve on a cloud GPU.
           </div>
-          {snap.catalog.map((m) => {
-            const localOk = canRunLocally(m);
+          {CATEGORIES.map(({ key, label }) => {
+            const items = snap.catalog.filter((m) => m.category === key);
+            if (!items.length) return null;
             return (
-              <div key={m.id} style={card}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontWeight: 600, color: "var(--fg)" }}>{m.name}</span>
-                  <span style={{ fontSize: 10, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>{m.params}</span>
-                  {localOk && <span style={badge}>on-device</span>}
-                  <span style={badge}>{gpuBadge[m.gpu]}</span>
-                </div>
-                <div style={{ fontSize: 12, color: "var(--fg-muted)", margin: "4px 0 8px" }}>{m.blurb}</div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {localOk && (
-                    <button disabled={busy} onClick={() => runLocal(m)} style={runBtn}>Run here (free)</button>
-                  )}
-                  <button disabled={busy} onClick={() => runCloud(m)} style={localOk ? secondaryBtn : runBtn}>
-                    {m.gpu === "cpu" ? "Run in cloud" : `Run on ${gpuBadge[m.gpu]}`}
-                  </button>
-                </div>
+              <div key={key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 10, color: "var(--fg-subtle)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 6 }}>{label}</div>
+                {items.map((m) => {
+                  const localOk = canRunLocally(m);
+                  return (
+                    <div key={m.id} style={card}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 600, color: "var(--fg)" }}>{m.name}</span>
+                        <span style={{ fontSize: 10, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>{m.params}</span>
+                        <span style={{ fontSize: 10, color: "var(--fg-subtle)" }}>{m.family}</span>
+                        {localOk && <span style={badge}>on-device</span>}
+                        <span style={badge}>{gpuBadge[m.gpu]}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--fg-muted)", margin: "4px 0 8px" }}>{m.blurb}</div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {localOk && <button disabled={busy} onClick={() => runLocal(m)} style={runBtn}>Run here (free)</button>}
+                        <button disabled={busy} onClick={() => runCloud(m)} style={localOk ? secondaryBtn : runBtn}>
+                          {m.gpu === "cpu" ? "Run in cloud" : `Run on ${gpuBadge[m.gpu]}`}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -200,7 +217,7 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
             {local && local.status === "ready" && <div style={{ fontSize: 11, color: "var(--fg-subtle)", marginTop: 6 }}>running privately on your device — no GPU rented.</div>}
 
             {!local && cloud!.status === "starting" && <div style={{ fontSize: 12, color: "var(--fg-muted)", marginTop: 6 }}>{msg || "starting…"}</div>}
-            {!local && cloud!.status === "running" && (
+            {!local && cloud!.status === "running" && isChat && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 10, color: "var(--fg-subtle)", textTransform: "uppercase", letterSpacing: "0.05em" }}>API endpoint</div>
                 <div onClick={() => navigator.clipboard?.writeText(endpoint).then(() => setMsg("copied")).catch(() => {})} title="copy"
@@ -210,25 +227,42 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
                 <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 4 }}>OpenAI-compatible · token = API key{msg === "copied" ? " · copied ✓" : ""}</div>
               </div>
             )}
-          </div>
-
-          <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-            {chat.length === 0 && chatEnabled && <div style={{ color: "var(--fg-subtle)", fontSize: 13 }}>Chat with {local ? local.model.name : cloud!.name}.</div>}
-            {chat.map((m, i) =>
-              m.role === "user" ? (
-                <div key={i} style={{ alignSelf: "flex-end", maxWidth: "90%", background: "var(--accent-soft)", color: "var(--fg)", borderRadius: "var(--radius)", padding: "7px 10px", fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content}</div>
-              ) : (
-                <div key={i} style={{ color: "var(--fg)", fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content}{m.streaming && <span style={{ opacity: 0.5 }}>▍</span>}</div>
-              )
+            {!local && cloud!.status === "running" && !isChat && (
+              <div style={{ fontSize: 11, color: "var(--fg-subtle)", marginTop: 6, lineHeight: 1.5 }}>
+                Serving on a {gpuBadge[cloud!.gpu ?? "a10g"]} GPU. Generate from your terminal or the
+                model's API — {runningCat} models don't have an in-panel chat. The serving stack is
+                configured on a real deploy.
+              </div>
             )}
-            <div ref={bottomRef} />
           </div>
 
-          <form onSubmit={send} style={{ borderTop: "1px solid var(--border)", padding: 10, display: "flex", gap: 8 }}>
-            <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={chatEnabled ? "Message the model…" : "starting…"} disabled={!chatEnabled || busy}
-              style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--fg)", padding: "8px 10px", fontSize: 13, outline: "none" }} />
-            <button type="submit" disabled={!chatEnabled || busy || !input.trim()} style={{ ...runBtn, width: "auto", padding: "8px 12px", opacity: !chatEnabled || busy || !input.trim() ? 0.4 : 1 }}>Send</button>
-          </form>
+          {isChat ? (
+            <>
+              <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                {chat.length === 0 && chatEnabled && <div style={{ color: "var(--fg-subtle)", fontSize: 13 }}>Chat with {local ? local.model.name : cloud!.name}.</div>}
+                {chat.map((m, i) =>
+                  m.role === "user" ? (
+                    <div key={i} style={{ alignSelf: "flex-end", maxWidth: "90%", background: "var(--accent-soft)", color: "var(--fg)", borderRadius: "var(--radius)", padding: "7px 10px", fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content}</div>
+                  ) : (
+                    <div key={i} style={{ color: "var(--fg)", fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content}{m.streaming && <span style={{ opacity: 0.5 }}>▍</span>}</div>
+                  )
+                )}
+                <div ref={bottomRef} />
+              </div>
+
+              <form onSubmit={send} style={{ borderTop: "1px solid var(--border)", padding: 10, display: "flex", gap: 8 }}>
+                <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={chatEnabled ? "Message the model…" : "starting…"} disabled={!chatEnabled || busy}
+                  style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--fg)", padding: "8px 10px", fontSize: 13, outline: "none" }} />
+                <button type="submit" disabled={!chatEnabled || busy || !input.trim()} style={{ ...runBtn, width: "auto", padding: "8px 12px", opacity: !chatEnabled || busy || !input.trim() ? 0.4 : 1 }}>Send</button>
+              </form>
+            </>
+          ) : (
+            <div style={{ flex: 1, overflowY: "auto", padding: 16, color: "var(--fg-muted)", fontSize: 13, lineHeight: 1.6 }}>
+              <b style={{ color: "var(--fg)" }}>{cloud!.name}</b> is provisioned. {cloud!.name} produces{" "}
+              {runningCat}, so you drive it from the terminal (its CLI / the served HTTP API) rather than a
+              chat box.
+            </div>
+          )}
         </>
       )}
     </div>
