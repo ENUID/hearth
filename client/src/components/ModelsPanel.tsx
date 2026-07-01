@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { getModels, startModel, stopModel, modelChat, generateImage, generateSpeech, type ModelsSnapshot, type ModelInfo } from "../lib/api";
+import { getModels, startModel, stopModel, generateImage, generateSpeech, type ModelsSnapshot, type ModelInfo } from "../lib/api";
 import { canRunLocally, webgpuAvailable, LocalEngine, type LocalChatMsg } from "../lib/local-llm";
 
 type ChatMsg = { role: "user" | "assistant"; content: string; streaming?: boolean };
@@ -127,12 +127,15 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
     }
   }
 
+  // In-panel chat only exists for on-device (WebLLM) models: that's the one
+  // case with no other way to reach the model (it runs entirely in this
+  // browser tab via WebGPU, nothing server-side to point a terminal at).
+  // Cloud/network-reachable models are chat-only from the terminal (`hearth`)
+  // or the API — see the hint rendered above when a cloud chat model is running.
   async function send(e: FormEvent) {
     e.preventDefault();
     const text = input.trim();
-    const localReady = local?.status === "ready";
-    const cloudReady = !local && cloud?.status === "running";
-    if (!text || busy || (!localReady && !cloudReady)) return;
+    if (!text || busy || local?.status !== "ready") return;
     setInput("");
     const history: ChatMsg[] = [...chat, { role: "user", content: text }];
     setChat([...history, { role: "assistant", content: "", streaming: true }]);
@@ -140,28 +143,10 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
     try {
       let acc = "";
       const onTok = () => setChat([...history, { role: "assistant", content: acc, streaming: true }]);
-      if (localReady) {
-        const msgs: LocalChatMsg[] = history.map((m) => ({ role: m.role, content: m.content }));
-        for await (const tok of local!.engine.chat(msgs)) {
-          acc += tok;
-          onTok();
-        }
-      } else {
-        const res = await modelChat(history.map((m) => ({ role: m.role, content: m.content })), ws);
-        if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error ?? `error ${res.status}`);
-        const reader = res.body.getReader();
-        const dec = new TextDecoder();
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          for (const line of dec.decode(value).split("\n")) {
-            if (!line.startsWith("data:")) continue;
-            const p = line.slice(5).trim();
-            if (p === "[DONE]") continue;
-            try { acc += JSON.parse(p).choices?.[0]?.delta?.content ?? ""; } catch { /* ignore */ }
-          }
-          onTok();
-        }
+      const msgs: LocalChatMsg[] = history.map((m) => ({ role: m.role, content: m.content }));
+      for await (const tok of local!.engine.chat(msgs)) {
+        acc += tok;
+        onTok();
       }
       setChat([...history, { role: "assistant", content: acc }]);
     } catch (err) {
@@ -259,7 +244,7 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
                   <span style={{ fontSize: 12, color: "var(--fg)" }}>
                     Chat in your terminal — type <code style={{ fontFamily: "var(--font-mono)", color: "var(--accent)", fontWeight: 600 }}>hearth</code>
                   </span>
-                  <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 2 }}>the model and the terminal, as one · or chat below</div>
+                  <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 2 }}>the model and the terminal, as one</div>
                 </div>
                 <div style={{ fontSize: 10, color: "var(--fg-subtle)", textTransform: "uppercase", letterSpacing: "0.05em" }}>API endpoint</div>
                 <div onClick={() => navigator.clipboard?.writeText(endpoint).then(() => setMsg("copied")).catch(() => {})} title="copy"
@@ -278,10 +263,10 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
             )}
           </div>
 
-          {isChat ? (
+          {isChat && local ? (
             <>
               <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-                {chat.length === 0 && chatEnabled && <div style={{ color: "var(--fg-subtle)", fontSize: 13 }}>Chat with {local ? local.model.name : cloud!.name}.</div>}
+                {chat.length === 0 && localReady && <div style={{ color: "var(--fg-subtle)", fontSize: 13 }}>Chat with {local.model.name}.</div>}
                 {chat.map((m, i) =>
                   m.role === "user" ? (
                     <div key={i} style={{ alignSelf: "flex-end", maxWidth: "90%", background: "var(--accent-soft)", color: "var(--fg)", borderRadius: "var(--radius)", padding: "7px 10px", fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content}</div>
@@ -293,11 +278,19 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
               </div>
 
               <form onSubmit={send} style={{ borderTop: "1px solid var(--border)", padding: 10, display: "flex", gap: 8 }}>
-                <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={chatEnabled ? "Message the model…" : "starting…"} disabled={!chatEnabled || busy}
+                <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={localReady ? "Message the model…" : "starting…"} disabled={!localReady || busy}
                   style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", color: "var(--fg)", padding: "8px 10px", fontSize: 13, outline: "none" }} />
-                <button type="submit" disabled={!chatEnabled || busy || !input.trim()} style={{ ...runBtn, width: "auto", padding: "8px 12px", opacity: !chatEnabled || busy || !input.trim() ? 0.4 : 1 }}>Send</button>
+                <button type="submit" disabled={!localReady || busy || !input.trim()} style={{ ...runBtn, width: "auto", padding: "8px 12px", opacity: !localReady || busy || !input.trim() ? 0.4 : 1 }}>Send</button>
               </form>
             </>
+          ) : isChat ? (
+            // Cloud/network chat model: no in-panel box — the header above already
+            // has the details (endpoint, hint). This is just the terminal-first callout.
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24, textAlign: "center" }}>
+              <div style={{ fontSize: 26, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>›_</div>
+              <div style={{ fontSize: 12, color: "var(--fg-muted)" }}>Open a terminal tab and run</div>
+              <code style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--accent)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "5px 12px" }}>hearth</code>
+            </div>
           ) : runningCat === "image" ? (
             <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
               {img ? (

@@ -265,6 +265,13 @@ and exposes `POST /api/models/v1/chat/completions` — an OpenAI-compatible
 endpoint clients can point any tool at (token = API key). Stop releases the GPU.
 This is the monetizable wedge: people pay for the GPU minutes the model uses.
 
+One chat surface per model, not two: an on-device model (WebLLM/WebGPU) has
+nowhere else to be reached from, so it keeps its in-panel chat box. A cloud/
+network-reachable model drops the in-panel box entirely — the `hearth` CLI
+(`bin/hearth`, talks to the same `/api/models/v1/chat/completions`) is the one
+place to chat with it, terminal and model as one; the Models panel just shows
+the hint + endpoint, not a duplicate chat window.
+
 ---
 
 ## 12. Risks and Mitigations

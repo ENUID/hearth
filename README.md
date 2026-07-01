@@ -20,8 +20,9 @@ Hearth gives you the machine and the tools.
   Works on a phone (installable PWA + on-screen keys, tabs, file upload/download,
   reconnect).
 - **Open-source AI, one tap** — run Llama, Qwen, Mistral, Gemma, DeepSeek and more.
-  Small models run **free on your device** (WebGPU); bigger ones run on a **cloud
-  GPU**. Chat in the panel or hit the **OpenAI-compatible API**. Image / audio /
+  Small models run **free on your device** (WebGPU), chatting right in the panel;
+  bigger ones run on a **cloud GPU** — chat with those from the terminal
+  (`hearth`, one command) or the **OpenAI-compatible API**. Image / audio /
   video models too.
 - **AI agents, one tap** — install Claude Code, Aider, Codex, goose… already wired
   to your model (or your own provider key).
