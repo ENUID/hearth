@@ -238,6 +238,13 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
             {local && local.status === "ready" && <div style={{ fontSize: 11, color: "var(--fg-subtle)", marginTop: 6 }}>running privately on your device — no GPU rented.</div>}
 
             {!local && cloud!.status === "starting" && <div style={{ fontSize: 12, color: "var(--fg-muted)", marginTop: 6 }}>{msg || "starting…"}</div>}
+            {!local && cloud!.status === "running" && snap.backend === "stub" && (
+              <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.5, color: "var(--danger)", border: "1px solid var(--danger)", borderRadius: "var(--radius-sm)", padding: "7px 9px" }}>
+                <b>demo backend</b> — {cloud!.name} isn't actually loaded on this deployment, so replies
+                are placeholders. Real serving activates with <code style={{ fontFamily: "var(--font-mono)" }}>HEARTH_MODEL_BACKEND=ollama</code> (or{" "}
+                <code style={{ fontFamily: "var(--font-mono)" }}>=http</code> + any OpenAI-compatible server).
+              </div>
+            )}
             {!local && cloud!.status === "running" && isChat && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ background: "var(--accent-soft)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "8px 10px", marginBottom: 8 }}>

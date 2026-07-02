@@ -16,6 +16,8 @@ import { getSettings } from "../lib/settings";
 type Props = {
   ws: string;
   runningModel: string | null;
+  /** Serving backend ("stub" = demo placeholders, "ollama"/"http" = real). */
+  modelBackend?: string;
   machineState: string;
   onOpenModels: () => void;
   /** Send raw bytes to the active terminal's PTY stdin (runs commands). */
@@ -63,7 +65,7 @@ function extractCommand(reply: string): string | null {
   return dollar ? dollar[1].trim() : null;
 }
 
-export default function CommandBar({ ws, runningModel, machineState, onOpenModels, runCmd, aiWrite, readContext, children }: Props) {
+export default function CommandBar({ ws, runningModel, modelBackend, machineState, onOpenModels, runCmd, aiWrite, readContext, children }: Props) {
   const [value, setValue] = useState("");
   const [manualMode, setManualMode] = useState<Mode | null>(null);
   const [busy, setBusy] = useState(false);
@@ -247,9 +249,18 @@ export default function CommandBar({ ws, runningModel, machineState, onOpenModel
             <span key={mode} className="hearth-rise" style={{ ...modePill, borderColor: isRun ? "var(--border-strong)" : "var(--accent)", color: isRun ? "var(--fg)" : "var(--accent)" }} title="Tab to switch">
               {isRun ? "›_ run" : "✦ ask"}
             </span>
-            <button type="button" onClick={onOpenModels} title="models" className={runningModel && !busy ? "hearth-pill-live" : undefined} style={modelChip}>
+            <button
+              type="button"
+              onClick={onOpenModels}
+              title={runningModel && modelBackend === "stub" ? "demo backend — replies are placeholders until a real model server (ollama / http) is configured" : "models"}
+              className={runningModel && !busy ? "hearth-pill-live" : undefined}
+              style={modelChip}
+            >
               <span style={{ color: runningModel ? "var(--accent)" : "var(--fg-subtle)", fontSize: 10 }}>✦</span>
               <span style={{ color: "var(--fg-muted)" }}>{modelLabel}</span>
+              {runningModel && modelBackend === "stub" && (
+                <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--bg)", background: "var(--danger)", borderRadius: 4, padding: "1px 5px", fontWeight: 700 }}>demo</span>
+              )}
               {machineState === "waking" || machineState === "provisioning" ? <span className="hearth-spin" style={{ width: 8, height: 8 }} /> : null}
             </button>
             <span style={{ flex: 1 }} />

@@ -24,7 +24,10 @@ function stubChat(res: Response, modelName: string, messages: { role: string; co
   res.setHeader("cache-control", "no-cache");
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const said = (lastUser?.content ?? "").slice(0, 200);
-  const reply = `[${modelName} · stub] You said: "${said}". I'm a placeholder response — attach a GPU and run with ollama (HEARTH_MODEL_BACKEND=ollama) to chat with the real model.`;
+  const reply =
+    `⚠ demo backend — this Hearth has no model server configured, so ${modelName} isn't actually loaded. ` +
+    `(You said: "${said}") To get real answers, the operator sets HEARTH_MODEL_BACKEND=ollama (or =http with any ` +
+    `OpenAI-compatible server) and this exact chat serves the real model.`;
   for (const word of reply.split(/(\s+)/)) {
     sse(res, { choices: [{ delta: { content: word }, finish_reason: null }] });
   }

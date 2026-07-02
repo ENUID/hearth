@@ -249,6 +249,7 @@ export default function App() {
   const [machineOpen, setMachineOpen] = useState(false);
   const [machineState, setMachineState] = useState<string>("");
   const [runningModel, setRunningModel] = useState<string | null>(null);
+  const [modelBackend, setModelBackend] = useState<string>("");
   useEffect(() => {
     let stop = false;
     setMachineState("");
@@ -256,7 +257,11 @@ export default function App() {
     const poll = () => {
       getMachine(activeWs).then((s) => !stop && setMachineState(s.machine?.state ?? "")).catch(() => {});
       getModels(activeWs)
-        .then((s) => !stop && setRunningModel(s.running && s.running.status !== "stopped" ? s.running.name : null))
+        .then((s) => {
+          if (stop) return;
+          setRunningModel(s.running && s.running.status !== "stopped" ? s.running.name : null);
+          setModelBackend(s.backend);
+        })
         .catch(() => {});
     };
     poll();
@@ -474,6 +479,7 @@ export default function App() {
           ws={activeWs}
           machineState={machineState}
           runningModel={runningModel}
+          modelBackend={modelBackend}
           onOpenModels={() => setModelsOpen(true)}
           runCmd={sendToActive}
           aiWrite={writeToActive}
