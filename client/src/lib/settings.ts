@@ -14,7 +14,9 @@ export interface Settings {
 export type Snapshot = Settings & { resolved: "light" | "dark" };
 
 const KEY = "hearth_settings";
-const DEFAULTS: Settings = { theme: "system", fontSize: 14, cursorStyle: "block", keyBar: "auto" };
+// Default to dark: Hearth's chrome is designed dark-first (calm deep-dark,
+// one ember accent). Users can switch to system/light in Settings.
+const DEFAULTS: Settings = { theme: "dark", fontSize: 14, cursorStyle: "block", keyBar: "auto" };
 
 function load(): Settings {
   try {

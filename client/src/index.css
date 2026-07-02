@@ -4,24 +4,25 @@
   padding: 0;
 }
 
-/* ── Hearth design tokens: neutral chrome, one signature accent (ember) ── */
+/* ── Hearth design tokens: calm deep-dark chrome, one signature accent (ember) ── */
 :root,
 :root[data-theme="dark"] {
-  --bg: #0a0a0c;
-  --bg-elevated: #131316;
-  --bg-glass: rgba(19, 19, 22, 0.78);
-  --bg-inset: #08090a;
-  --fg: #e8e9ea;
-  --fg-muted: #969a9f;
-  --fg-subtle: #5f646a;
-  --border: #1c1e22;
-  --border-strong: #2b2e33;
+  --bg: #0d0e11;              /* calm, cool near-black (not pure black) */
+  --bg-elevated: #16181d;
+  --bg-glass: rgba(20, 22, 27, 0.82);
+  --bg-inset: #0a0b0d;
+  --fg: #e7e9ec;
+  --fg-muted: #8b9198;
+  --fg-subtle: #595f67;
+  --border: #1e2127;
+  --border-strong: #2c3038;
   --accent: #ff7a45;          /* ember */
   --accent-2: #ffb454;        /* amber — paired with --accent for gradients */
   --accent-soft: rgba(255, 122, 69, 0.12);
   --accent-glow: rgba(255, 122, 69, 0.45);
   --selection: rgba(255, 122, 69, 0.22);
   --danger: #e2615a;
+  --ok: #4ec9a6;
   color-scheme: dark;
 }
 
@@ -41,6 +42,7 @@
   --accent-glow: rgba(194, 65, 12, 0.30);
   --selection: rgba(194, 65, 12, 0.14);
   --danger: #b4453f;
+  --ok: #0f9d76;
   color-scheme: light;
 }
 
@@ -100,3 +102,23 @@ button { font-family: inherit; }
 /* the active terminal pane gets a faint ember edge when focused — terminal
    and model feel like one lit surface, not a plain black box */
 .hearth-term:focus-within { box-shadow: inset 0 0 0 1px var(--accent-soft); }
+
+/* spinner ring for transitional status (provisioning / waking) — the calm,
+   "working…" affordance from a good agent UI, in Hearth's chrome */
+@keyframes hearthSpin { to { transform: rotate(360deg); } }
+.hearth-spin {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: hearthSpin 0.7s linear infinite;
+}
+
+/* the bottom command bar lifts on focus — one lit surface with the terminal */
+.hearth-cmdbar { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.hearth-cmdbar:focus-within {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 -2px 20px rgba(0, 0, 0, 0.25);
+}

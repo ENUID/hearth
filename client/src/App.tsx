@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import TerminalTab from "./components/TerminalTab";
 import KeyBar from "./components/KeyBar";
+import CommandBar from "./components/CommandBar";
 import Login from "./components/Login";
 import MachinePanel from "./components/MachinePanel";
 import SettingsPanel from "./components/SettingsPanel";
@@ -11,7 +12,7 @@ import TeamsPanel from "./components/TeamsPanel";
 import BillingPanel from "./components/BillingPanel";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
-import { getConfig, getToken, uploadFile, downloadUrl, getMachine, killSession, getMe, logout, getScope, setScope, getTeams, signOutEverywhere, changePassword, type Team } from "./lib/api";
+import { getConfig, getToken, uploadFile, downloadUrl, getMachine, getModels, killSession, getMe, logout, getScope, setScope, getTeams, signOutEverywhere, changePassword, type Team } from "./lib/api";
 import { useSettings, setSettings } from "./lib/settings";
 
 type Mods = { ctrl: boolean; alt: boolean };
@@ -229,13 +230,20 @@ export default function App() {
     };
   }, []);
 
-  // --- machine status (per active workspace) ---
+  // --- machine + running-model status (per active workspace) ---
   const [machineOpen, setMachineOpen] = useState(false);
   const [machineState, setMachineState] = useState<string>("");
+  const [runningModel, setRunningModel] = useState<string | null>(null);
   useEffect(() => {
     let stop = false;
     setMachineState("");
-    const poll = () => getMachine(activeWs).then((s) => !stop && setMachineState(s.machine?.state ?? "")).catch(() => {});
+    setRunningModel(null);
+    const poll = () => {
+      getMachine(activeWs).then((s) => !stop && setMachineState(s.machine?.state ?? "")).catch(() => {});
+      getModels(activeWs)
+        .then((s) => !stop && setRunningModel(s.running && s.running.status !== "stopped" ? s.running.name : null))
+        .catch(() => {});
+    };
     poll();
     const t = setInterval(poll, 8000);
     return () => {
@@ -413,7 +421,11 @@ export default function App() {
           ◆ agents
         </button>
         <button onClick={() => setMachineOpen(true)} title="machine" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
-          <span className={machineState === "running" ? "hearth-pulse" : undefined} style={{ color: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", fontSize: 8, display: "inline-block" }}>●</span>
+          {machineState === "waking" || machineState === "provisioning" ? (
+            <span className="hearth-spin" style={{ width: 9, height: 9 }} />
+          ) : (
+            <span className={machineState === "running" ? "hearth-pulse" : undefined} style={{ width: 7, height: 7, borderRadius: 999, background: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", display: "inline-block" }} />
+          )}
           <span style={{ color: "var(--fg-muted)" }}>{machineState || "machine"}</span>
         </button>
         <button onClick={() => setSettingsOpen(true)} title="settings" style={{ ...ghostBtn, display: "flex", alignItems: "center", padding: "4px 6px" }} aria-label="settings">
@@ -462,6 +474,13 @@ export default function App() {
         )}
       </div>
 
+      <CommandBar
+        workspace={activeWsName}
+        machineState={machineState}
+        runningModel={runningModel}
+        onRun={sendToActive}
+        onOpenModels={() => setModelsOpen(true)}
+      />
       {showKeyBar && <KeyBar onSend={sendToActive} mods={mods} onToggleCtrl={toggleCtrl} onToggleAlt={toggleAlt} />}
       {machineOpen && <MachinePanel ws={activeWs} onClose={() => setMachineOpen(false)} />}
       {settingsOpen && <SettingsPanel commands={commands} onClose={() => setSettingsOpen(false)} />}
