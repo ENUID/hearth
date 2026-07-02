@@ -28,6 +28,7 @@ export interface ModelInfo {
 
 export const MODEL_CATALOG: ModelInfo[] = [
   // ---- Chat / LLM (text) ----
+  { id: "gpt2", name: "GPT-2", params: "124M", family: "OpenAI (open weights)", gpu: "cpu", sizeGb: 0.7, blurb: "The 2019 classic. Runs on plain CPU — see scripts/gpt2-server.py.", category: "chat", localTier: "none" },
   { id: "llama3.2:1b", name: "Llama 3.2 1B", params: "1B", family: "Meta Llama", gpu: "cpu", sizeGb: 1.3, blurb: "Tiny + fast. Runs right on your device.", category: "chat", localTier: "easy", mlcId: "Llama-3.2-1B-Instruct-q4f16_1-MLC" },
   { id: "llama3.1:8b", name: "Llama 3.1 8B", params: "8B", family: "Meta Llama", gpu: "a10g", sizeGb: 4.7, blurb: "Strong general-purpose assistant.", category: "chat", localTier: "heavy", mlcId: "Llama-3.1-8B-Instruct-q4f16_1-MLC" },
   { id: "qwen2.5:7b", name: "Qwen2.5 7B", params: "7B", family: "Alibaba Qwen", gpu: "a10g", sizeGb: 4.7, blurb: "Excellent at code and reasoning.", category: "chat", localTier: "heavy", mlcId: "Qwen2.5-7B-Instruct-q4f16_1-MLC" },

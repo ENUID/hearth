@@ -59,6 +59,10 @@ fly deploy
 
 For **real cloud AI** (so weak-device users get genuine inference), point
 `OLLAMA_HOST` at an ollama server running on a GPU (a Fly GPU machine or RunPod).
+Or bring **any OpenAI-compatible server** (llama.cpp, vLLM, LM Studio) with
+`HEARTH_MODEL_BACKEND=http` + `HEARTH_MODEL_ENDPOINT`. No GPU anywhere?
+`scripts/gpt2-server.py` serves a real open model (GPT-2) on plain CPU —
+the whole pipeline runs against genuine weights.
 **Read [SECURITY.md](./SECURITY.md) before opening it to the public.**
 
 ## Status

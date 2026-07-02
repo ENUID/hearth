@@ -65,6 +65,32 @@ export class OllamaRunner implements ModelRunner {
   }
 }
 
+// Generic OpenAI-compatible backend. Activates with HEARTH_MODEL_BACKEND=http
+// and HEARTH_MODEL_ENDPOINT=<base>/v1 — point it at anything that speaks the
+// OpenAI chat API: llama.cpp server, vLLM, LM Studio, text-generation-webui,
+// or Hearth's own scripts/gpt2-server.py (a real open model on plain CPU).
+export class HttpRunner implements ModelRunner {
+  readonly name = "http";
+  private base = (process.env.HEARTH_MODEL_ENDPOINT ?? "http://localhost:8090/v1").replace(/\/$/, "");
+
+  async start(_modelId: string): Promise<void> {
+    const res = await fetch(`${this.base}/models`).catch(() => null);
+    if (!res || !res.ok) throw new Error(`no OpenAI-compatible server at ${this.base} (set HEARTH_MODEL_ENDPOINT)`);
+  }
+
+  async stop(_modelId: string): Promise<void> {
+    /* external server owns its lifecycle */
+  }
+
+  endpoint(): string | null {
+    return this.base;
+  }
+}
+
 export function makeRunner(): ModelRunner {
-  return process.env.HEARTH_MODEL_BACKEND === "ollama" ? new OllamaRunner() : new StubRunner();
+  switch (process.env.HEARTH_MODEL_BACKEND) {
+    case "ollama": return new OllamaRunner();
+    case "http": return new HttpRunner();
+    default: return new StubRunner();
+  }
 }
