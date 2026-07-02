@@ -39,6 +39,8 @@ const CMDS = new Set([
   "rm","mv","cp","touch","chmod","chown","kill","ps","top","htop","clear","export","source","echo",
   "which","man","less","head","tail","history","df","du","free","uname","whoami","pwd","env",
   "alias","ollama","cargo","go","rustc","gcc","java","mvn","bash","sh","zsh","tmux","screen","hearth",
+  // AI agent CLIs — launching an agent is a run, not a question
+  "claude","aider","codex","goose","gemini","opencode","interpreter","openhands",
 ]);
 
 function detectMode(s: string): Mode {
