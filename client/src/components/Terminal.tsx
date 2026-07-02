@@ -39,12 +39,21 @@ function xtermTheme(resolved: "light" | "dark"): ITheme {
   };
 }
 
+/** A handle the AI prompt uses to live inside this terminal: write styled
+ *  text into the scrollback, and read the recent screen as context. */
+export type TermHandle = {
+  write: (text: string) => void;
+  readTail: (lines: number) => string;
+};
+
 type Props = {
   ptySocket: PtySocket;
   /** Sticky modifiers from the mobile key bar, applied to the next typed char. */
   modifiersRef?: MutableRefObject<Mods>;
   /** Called after a sticky modifier is consumed, so the UI can clear it. */
   onConsumeModifiers?: () => void;
+  /** Receives a TermHandle once the terminal is live (null on dispose). */
+  onTerm?: (handle: TermHandle | null) => void;
 };
 
 // Only enable the GPU renderer when a real WebGL2 context can be created.
@@ -70,8 +79,11 @@ function applyMods(data: string, mods: Mods): string {
   return ch;
 }
 
-export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }: Props) {
+export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers, onTerm }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Keep the latest callback without re-running the terminal-creation effect.
+  const onTermRef = useRef(onTerm);
+  onTermRef.current = onTerm;
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
@@ -157,6 +169,21 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
     fitRef.current = fitAddon;
     searchRef.current = searchAddon;
 
+    // Hand the AI prompt a way to render into this terminal and read its screen.
+    onTermRef.current?.({
+      write: (text) => term.write(text),
+      readTail: (lines) => {
+        const buf = term.buffer.active;
+        const end = buf.baseY + buf.cursorY;
+        const out: string[] = [];
+        for (let i = Math.max(0, end - lines); i <= end; i++) {
+          const line = buf.getLine(i);
+          if (line) out.push(line.translateToString(true));
+        }
+        return out.join("\n").trim();
+      },
+    });
+
     // Copy/paste/search keyboard shortcuts.
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
@@ -226,6 +253,7 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers }
       clearInterval(timer);
       unsubData();
       ro.disconnect();
+      onTermRef.current?.(null);
       try {
         webgl?.dispose();
       } catch {

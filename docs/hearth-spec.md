@@ -265,12 +265,16 @@ and exposes `POST /api/models/v1/chat/completions` — an OpenAI-compatible
 endpoint clients can point any tool at (token = API key). Stop releases the GPU.
 This is the monetizable wedge: people pay for the GPU minutes the model uses.
 
-One chat surface per model, not two: an on-device model (WebLLM/WebGPU) has
-nowhere else to be reached from, so it keeps its in-panel chat box. A cloud/
-network-reachable model drops the in-panel box entirely — the `hearth` CLI
-(`bin/hearth`, talks to the same `/api/models/v1/chat/completions`) is the one
-place to chat with it, terminal and model as one; the Models panel just shows
-the hint + endpoint, not a duplicate chat window.
+**The unified prompt — terminal and AI as one interface.** The client has a
+single input dock (`CommandBar.tsx`): type a shell command and it runs in the
+PTY; type plain language and the AI's reply streams as styled ANSI text *into
+the terminal scrollback itself* — commands, output, and conversation are one
+stream, not two windows. Mode is detected live as you type (Tab overrides).
+The AI reads the last lines of the terminal screen as context, so "why did
+that fail?" works; when a reply contains a command, a one-tap ▶ run chip
+executes it in the same terminal. The `hearth` CLI (`bin/hearth`) is the same
+loop for pure-terminal users, against the same
+`/api/models/v1/chat/completions` endpoint.
 
 ---
 

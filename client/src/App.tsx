@@ -12,6 +12,7 @@ import TeamsPanel from "./components/TeamsPanel";
 import BillingPanel from "./components/BillingPanel";
 import CommandPalette, { type Command } from "./components/CommandPalette";
 import type { PtySocket } from "./hooks/usePtySocket";
+import type { TermHandle } from "./components/Terminal";
 import { getConfig, getToken, uploadFile, downloadUrl, getMachine, getModels, killSession, getMe, logout, getScope, setScope, getTeams, signOutEverywhere, changePassword, type Team } from "./lib/api";
 import { useSettings, setSettings } from "./lib/settings";
 
@@ -143,6 +144,20 @@ export default function App() {
   }, []);
   const sendToActive = useCallback((data: string) => {
     ptys.current.get(activeSidRef.current)?.send(data);
+  }, []);
+
+  // Terminal display handles (per sid) — the AI prompt writes its replies into
+  // the active terminal's scrollback and reads the screen for context.
+  const terms = useRef(new Map<string, TermHandle>());
+  const registerTerm = useCallback((sid: string, h: TermHandle | null) => {
+    if (h) terms.current.set(sid, h);
+    else terms.current.delete(sid);
+  }, []);
+  const writeToActive = useCallback((text: string) => {
+    terms.current.get(activeSidRef.current)?.write(text);
+  }, []);
+  const readActiveTail = useCallback((lines: number) => {
+    return terms.current.get(activeSidRef.current)?.readTail(lines) ?? "";
   }, []);
 
   // tab ops (within the active workspace)
@@ -460,6 +475,9 @@ export default function App() {
           machineState={machineState}
           runningModel={runningModel}
           onOpenModels={() => setModelsOpen(true)}
+          runCmd={sendToActive}
+          aiWrite={writeToActive}
+          readContext={readActiveTail}
         >
           <div
             style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 0 }}
@@ -468,7 +486,7 @@ export default function App() {
           >
             {cur.tabs.map((t) => {
               const sid = `${activeWs}__${t.id}`;
-              return <TerminalTab key={sid} sid={sid} active={t.id === cur.active} modifiersRef={modifiersRef} onConsumeModifiers={clearMods} register={register} />;
+              return <TerminalTab key={sid} sid={sid} active={t.id === cur.active} modifiersRef={modifiersRef} onConsumeModifiers={clearMods} register={register} registerTerm={registerTerm} />;
             })}
           </div>
         </CommandBar>
