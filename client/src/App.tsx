@@ -453,18 +453,25 @@ export default function App() {
         <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { if (e.target.files?.length) uploadFiles(e.target.files); e.target.value = ""; }} />
       </div>
 
-      {/* terminals (+ optional models panel) for the active workspace */}
+      {/* one window: terminal + AI conversation + composer, for the active workspace */}
       <div style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
-        <div
-          style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 0 }}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); if (e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files); }}
+        <CommandBar
+          ws={activeWs}
+          machineState={machineState}
+          runningModel={runningModel}
+          onOpenModels={() => setModelsOpen(true)}
         >
-          {cur.tabs.map((t) => {
-            const sid = `${activeWs}__${t.id}`;
-            return <TerminalTab key={sid} sid={sid} active={t.id === cur.active} modifiersRef={modifiersRef} onConsumeModifiers={clearMods} register={register} />;
-          })}
-        </div>
+          <div
+            style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 0 }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); if (e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files); }}
+          >
+            {cur.tabs.map((t) => {
+              const sid = `${activeWs}__${t.id}`;
+              return <TerminalTab key={sid} sid={sid} active={t.id === cur.active} modifiersRef={modifiersRef} onConsumeModifiers={clearMods} register={register} />;
+            })}
+          </div>
+        </CommandBar>
         {modelsOpen && <ModelsPanel ws={activeWs} onClose={() => setModelsOpen(false)} />}
         {agentsOpen && (
           <AgentsPanel
@@ -474,13 +481,6 @@ export default function App() {
         )}
       </div>
 
-      <CommandBar
-        workspace={activeWsName}
-        machineState={machineState}
-        runningModel={runningModel}
-        onRun={sendToActive}
-        onOpenModels={() => setModelsOpen(true)}
-      />
       {showKeyBar && <KeyBar onSend={sendToActive} mods={mods} onToggleCtrl={toggleCtrl} onToggleAlt={toggleAlt} />}
       {machineOpen && <MachinePanel ws={activeWs} onClose={() => setMachineOpen(false)} />}
       {settingsOpen && <SettingsPanel commands={commands} onClose={() => setSettingsOpen(false)} />}

@@ -183,6 +183,15 @@ export const getModels = (ws = "workspace"): Promise<ModelsSnapshot> => authedJs
 export const startModel = (modelId: string, ws = "workspace"): Promise<{ running: RunningModel }> => authedJson("/api/models/start", { method: "POST", body: { modelId, ws } });
 export const stopModel = (ws = "workspace"): Promise<{ running: RunningModel | null }> => authedJson("/api/models/stop", { method: "POST", body: { ws } });
 
+/** Streaming OpenAI-compatible chat against the workspace's running model. */
+export function modelChat(messages: { role: string; content: string }[], ws = "workspace"): Promise<Response> {
+  return fetch(withScope("/api/models/v1/chat/completions"), {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ ws, messages, stream: true }),
+  });
+}
+
 /** Generate an image with the workspace's running image model. Returns a data URL. */
 export async function generateImage(prompt: string, ws = "workspace"): Promise<{ url: string; backend: string; note?: string }> {
   const r = await fetch(withScope(`/api/models/v1/images/generations?ws=${W(ws)}`), {
