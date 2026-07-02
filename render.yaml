@@ -1,0 +1,51 @@
+# Render Blueprint — deploy Hearth with a permanent public URL.
+#
+#   render.com → New → Blueprint → connect this repo → pick your branch → Apply
+#
+# Render builds ./Dockerfile, serves on its $PORT over HTTPS with WebSockets
+# (a terminal needs a long-lived server — serverless platforms can't host it),
+# and auto-redeploys on every push to the chosen branch. You get
+# https://<name>.onrender.com — open it on any device, including an iPad.
+#
+# Auth is ON by default: a random password is generated at deploy time. Read it
+# in the Render dashboard under the service's Environment tab (HEARTH_PASSWORD)
+# and use it to sign in. Keep auth on — this is a real shell on the internet.
+#
+# This defaults to the FREE plan so you can try it with zero cost. Free-plan
+# realities: the instance sleeps after ~15 min idle (next visit takes ~1 min to
+# wake and live terminal sessions don't survive the sleep), and there is no
+# disk — the workspace filesystem resets on every deploy/restart. When it
+# should feel like a real computer, switch `plan: free` to `plan: starter` and
+# uncomment the disk block below (paid): state then survives restarts.
+services:
+  - type: web
+    name: hearth
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    # --- persistent state (paid plans only — uncomment with plan: starter) ---
+    # disk:
+    #   name: hearth-state
+    #   mountPath: /data
+    #   sizeGB: 3
+    envVars:
+      # - key: HEARTH_STATE_DIR        # pair with the disk block above
+      #   value: /data/sessions
+      - key: HEARTH_REQUIRE_AUTH
+        value: "true"
+      - key: HEARTH_PASSWORD
+        generateValue: true
+      - key: HEARTH_JWT_SECRET
+        generateValue: true
+      # Multi-user accounts (own login per person) instead of a shared password:
+      # - key: HEARTH_MULTIUSER
+      #   value: "true"
+      # Real AI answers (models otherwise run the honest "demo" stub): point at
+      # any OpenAI-compatible server — ollama on a GPU box, vLLM, llama.cpp,
+      # or scripts/gpt2-server.py running somewhere with ~2 GB RAM.
+      # - key: HEARTH_MODEL_BACKEND
+      #   value: http
+      # - key: HEARTH_MODEL_ENDPOINT
+      #   value: https://your-model-server.example.com/v1

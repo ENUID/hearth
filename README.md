@@ -44,21 +44,25 @@ Or the full containerized version (terminal + persistent Linux box):
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-## Make it public (Fly.io)
+## Make it public (Render)
 
-A terminal is code execution, so each user needs their own isolated machine. Fly.io
-gives every workspace its own Firecracker **microVM** (a serverless host can't do
-this). `fly.toml` is preconfigured for multi-user + a machine per workspace.
+The repo ships a Render Blueprint (`render.yaml`): no CLI, works from any
+device's browser — including an iPad.
 
-```bash
-fly launch --no-deploy
-fly secrets set HEARTH_JWT_SECRET=$(openssl rand -hex 32) FLY_API_TOKEN=$(fly auth token)
-fly volumes create hearth_state --size 3
-fly deploy
-```
+1. [render.com](https://render.com) → **New → Blueprint** → connect this repo
+   → pick your branch → **Apply**.
+2. Render builds `./Dockerfile` and gives you `https://<name>.onrender.com`,
+   auto-redeploying on every push.
+3. Auth is on: your generated password is in the service's **Environment** tab
+   (`HEARTH_PASSWORD`).
+
+The default is the free plan (sleeps when idle, no persistent disk). For real
+persistence, switch to `plan: starter` and uncomment the disk block in
+`render.yaml`. Prefer Fly.io (per-workspace Firecracker microVMs, `fly.toml`
+is preconfigured)? `fly launch --no-deploy && fly deploy` works too.
 
 For **real cloud AI** (so weak-device users get genuine inference), point
-`OLLAMA_HOST` at an ollama server running on a GPU (a Fly GPU machine or RunPod).
+`OLLAMA_HOST` at an ollama server running on a GPU (or RunPod).
 Or bring **any OpenAI-compatible server** (llama.cpp, vLLM, LM Studio) with
 `HEARTH_MODEL_BACKEND=http` + `HEARTH_MODEL_ENDPOINT`. No GPU anywhere?
 `scripts/gpt2-server.py` serves a real open model (GPT-2) on plain CPU —
@@ -69,7 +73,7 @@ the whole pipeline runs against genuine weights.
 
 Built and verified: the terminal, accounts + per-user isolation, on-device AI,
 agents, and the cloud (ollama) serving path. The only things left to actually
-launch are a GPU running ollama and your Fly account.
+launch are a GPU running ollama and a Render (or Fly) account.
 
 ## What's in the repo
 
@@ -77,7 +81,7 @@ launch are a GPU running ollama and your Fly account.
 |------|-----------|
 | `client/` | React 19 + Vite PWA — terminal, models/agents panels, login. |
 | `server/` | Node bridge — WebSocket ⇄ PTY, accounts, control plane, model runners. |
-| `docker/`, `fly.toml` | Local container + Fly deploy. |
+| `docker/`, `render.yaml`, `fly.toml` | Local container + Render / Fly deploy. |
 | `docs/`, `SECURITY.md` | Guides, spec, and the security/threat model. |
 
 ## Tech
