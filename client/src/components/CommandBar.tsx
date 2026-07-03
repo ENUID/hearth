@@ -26,6 +26,8 @@ type Props = {
   aiWrite: (text: string) => void;
   /** Read the last N lines of the active terminal screen (AI context). */
   readContext: (lines: number) => string;
+  /** Upload files into the active session's cwd. Returns each file's result. */
+  onAttach: (files: FileList | File[]) => Promise<{ name: string; ok: boolean; path?: string }[]>;
   children: ReactNode; // the terminal pane(s) — the prompt docks under them
 };
 
@@ -77,19 +79,55 @@ function extractCommand(reply: string): string | null {
   return dollar ? dollar[1].trim() : null;
 }
 
-export default function CommandBar({ ws, runningModel, modelBackend, machineState, onOpenModels, runCmd, aiWrite, readContext, children }: Props) {
+export default function CommandBar({ ws, runningModel, modelBackend, machineState, onOpenModels, runCmd, aiWrite, readContext, onAttach, children }: Props) {
   const [value, setValue] = useState("");
   const [manualMode, setManualMode] = useState<Mode | null>(null);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState(0);
   const [suggested, setSuggested] = useState<string | null>(null);
+  const [attaching, setAttaching] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Per-workspace conversation memory (display lives in the terminal itself).
   const historyRef = useRef<Record<string, Msg[]>>({});
   const sentRef = useRef<string[]>([]);
   const recallRef = useRef(-1);
 
   const mode: Mode = manualMode ?? detectMode(value);
+
+  // Attach files right from the prompt — upload into the active session's cwd,
+  // then drop each uploaded name into the composer so it's ready to reference
+  // ("what's in screenshot.png?", "run this: data.csv").
+  async function attach(files: FileList | File[]) {
+    if (!files || files.length === 0) return;
+    setAttaching(true);
+    try {
+      const results = await onAttach(files);
+      const names = results.filter((r) => r.ok).map((r) => r.name);
+      if (names.length) {
+        setValue((v) => (v.trim() ? v.replace(/\s*$/, " ") : "") + names.map((n) => `\`${n}\``).join(" ") + " ");
+        taRef.current?.focus();
+      }
+    } finally {
+      setAttaching(false);
+    }
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer?.files?.length) void attach(e.dataTransfer.files);
+  }
+
+  // Paste an image (screenshot, copied file) straight into the prompt.
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (files.length) {
+      e.preventDefault();
+      void attach(files);
+    }
+  }
 
   useEffect(() => {
     if (!busy) { setPhase(0); return; }
@@ -235,7 +273,25 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
 
       {/* the prompt — docked in the same window, driving the same scrollback */}
       <div style={dock}>
-        <div className="hearth-cmdbar" style={promptBox}>
+        <div
+          className="hearth-cmdbar"
+          style={{ ...promptBox, ...(dragOver ? promptBoxDragOver : {}) }}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => { if (e.target.files?.length) void attach(e.target.files); e.target.value = ""; }}
+          />
+          {dragOver && (
+            <div style={dropOverlay}>
+              <span style={{ color: "var(--accent)", fontSize: 13, fontWeight: 600 }}>drop to attach</span>
+            </div>
+          )}
           {suggested && (
             <button className="hearth-rise hearth-act" onClick={() => { runCmd(suggested + "\r"); setSuggested(null); }} style={suggestChip} title="run the AI's suggested command">
               <span style={{ color: "var(--accent)" }}>▶</span>
@@ -248,6 +304,7 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={onKeyDown}
+            onPaste={onPaste}
             placeholder={runningModel ? `Ask ${runningModel} anything, or type a command — Hearth knows which` : "Type a command · start a model in ✦ models to ask AI"}
             rows={1}
             autoCapitalize="none"
@@ -257,6 +314,17 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
             aria-label="hearth prompt"
           />
           <div style={row}>
+            {/* attach — pictures, files, anything, right from the prompt */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={attaching}
+              title="attach a file or image"
+              className="hearth-act"
+              style={{ ...attachBtn, opacity: attaching ? 0.5 : 1 }}
+            >
+              {attaching ? <span className="hearth-spin" style={{ width: 12, height: 12 }} /> : <ClipIcon />}
+            </button>
             {/* live mode pill — flips as you type; Tab toggles */}
             <span key={mode} className="hearth-rise" style={{ ...modePill, borderColor: isRun ? "var(--border-strong)" : "var(--accent)", color: isRun ? "var(--fg)" : "var(--accent)" }} title="Tab to switch">
               {isRun ? "›_ run" : "✦ ask"}
@@ -329,7 +397,45 @@ const promptBox: CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: 16,
   padding: "10px 12px",
+  position: "relative",
 };
+const promptBoxDragOver: CSSProperties = {
+  borderColor: "var(--accent)",
+  boxShadow: "0 0 0 1px var(--accent-soft)",
+};
+const dropOverlay: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "var(--accent-soft)",
+  border: "1.5px dashed var(--accent)",
+  borderRadius: 16,
+  zIndex: 2,
+  pointerEvents: "none",
+};
+const attachBtn: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 26,
+  height: 26,
+  borderRadius: 8,
+  background: "transparent",
+  border: "1px solid var(--border)",
+  color: "var(--fg-muted)",
+  cursor: "pointer",
+  flexShrink: 0,
+};
+
+function ClipIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+    </svg>
+  );
+}
 const suggestChip: CSSProperties = {
   display: "flex",
   alignItems: "center",

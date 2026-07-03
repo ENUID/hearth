@@ -273,15 +273,17 @@ export default function App() {
   }, [activeWs]);
 
   // --- file transfer ---
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState("");
-  const uploadFiles = useCallback(async (files: FileList | File[]) => {
+  const uploadFiles = useCallback(async (files: FileList | File[]): Promise<{ name: string; ok: boolean; path?: string }[]> => {
+    const results: { name: string; ok: boolean; path?: string }[] = [];
     for (const f of Array.from(files)) {
       setStatus(`uploading ${f.name}…`);
-      const r: { ok?: boolean; error?: string } = await uploadFile(activeSidRef.current, f).catch(() => ({ error: "failed" }));
+      const r: { ok?: boolean; path?: string; error?: string } = await uploadFile(activeSidRef.current, f).catch(() => ({ error: "failed" }));
       setStatus(r.ok ? `uploaded ${f.name}` : `upload failed: ${r.error ?? ""}`);
+      results.push({ name: f.name, ok: !!r.ok, path: r.path });
     }
     setTimeout(() => setStatus(""), 4000);
+    return results;
   }, []);
   const download = useCallback(() => {
     const p = window.prompt("Download which file? (path relative to the current directory)");
@@ -335,7 +337,6 @@ export default function App() {
     { id: "welcome", title: "Show welcome / quick start", hint: "app", run: () => setWelcomeOpen(true) },
     { id: "settings", title: "Settings", hint: "app", run: () => setSettingsOpen(true) },
     { id: "theme", title: `Theme: ${settings.theme} → next`, hint: "app", run: cycleTheme },
-    { id: "upload", title: "Upload file…", hint: "files", run: () => fileInputRef.current?.click() },
     { id: "download", title: "Download file…", hint: "files", run: download },
   ];
 
@@ -475,7 +476,6 @@ export default function App() {
           </div>
         )}
 
-        <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { if (e.target.files?.length) uploadFiles(e.target.files); e.target.value = ""; }} />
       </div>
 
       {/* one window: terminal + AI conversation + composer, for the active workspace */}
@@ -489,6 +489,7 @@ export default function App() {
           runCmd={sendToActive}
           aiWrite={writeToActive}
           readContext={readActiveTail}
+          onAttach={uploadFiles}
         >
           <div
             style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 0 }}
