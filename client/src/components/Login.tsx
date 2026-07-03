@@ -29,12 +29,28 @@ export default function Login({ onAuthed, multiUser, instanceName = "hearth", si
   const canSubmit = multiUser ? username.length >= 2 && password.length >= 6 : password.length > 0;
 
   return (
-    <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
-      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12, width: 300, padding: 24, background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 10 }}>
-        <div style={{ fontWeight: 700, color: "var(--fg)", fontFamily: "var(--font-mono)", fontSize: 20, letterSpacing: "-0.02em" }}>{instanceName}</div>
-        <div style={{ color: "var(--fg-subtle)", fontSize: 12, marginTop: -6, marginBottom: 4 }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22, position: "relative", overflow: "hidden" }}>
+      {/* ambient hearth-glow behind the card */}
+      <div aria-hidden style={{ position: "absolute", width: 520, height: 520, borderRadius: "50%", background: "radial-gradient(circle, var(--accent-soft) 0%, transparent 62%)", filter: "blur(8px)", pointerEvents: "none" }} />
+
+      {/* the mark, above the card — a moment, not a form */}
+      <div className="hearth-rise" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, zIndex: 1 }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ filter: "drop-shadow(0 0 14px var(--accent-glow))" }}>
+          <defs>
+            <linearGradient id="loginFlame" x1="0" y1="24" x2="0" y2="0">
+              <stop offset="0%" style={{ stopColor: "var(--accent)" }} />
+              <stop offset="100%" style={{ stopColor: "var(--accent-2)" }} />
+            </linearGradient>
+          </defs>
+          <path fill="url(#loginFlame)" d="M12 2c.6 2.6-.4 4.3-2 6-1.8 1.9-3 3.8-3 6.3A5 5 0 0 0 12 19a5 5 0 0 0 5-4.7c.1-1.7-.6-2.9-1.6-4 .1 1.6-.5 2.6-1.4 3.3-.3-1.6-1-2.4-2-3.3-1.1-1-1.4-2.3-1-3.8.9.4 1.6 1 2 2 .8-1.7.7-3.6-1-6.5Z" />
+        </svg>
+        <div style={{ fontWeight: 600, color: "var(--fg)", fontFamily: "var(--font-mono)", fontSize: 22, letterSpacing: "-0.02em" }}>{instanceName}</div>
+        <div style={{ color: "var(--fg-subtle)", fontSize: 12 }}>
           {multiUser ? (creating ? "create your account" : "sign in to your computer") : "your computer, in the browser"}
         </div>
+      </div>
+
+      <form onSubmit={submit} className="hearth-elevated hearth-rise" style={{ display: "flex", flexDirection: "column", gap: 12, width: 320, padding: 24, background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 14, zIndex: 1 }}>
 
         {multiUser && (
           <input

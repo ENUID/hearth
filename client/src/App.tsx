@@ -426,31 +426,36 @@ export default function App() {
         </div>
 
         {status && <span style={{ color: "var(--fg-muted)", fontSize: 11, marginRight: 8 }}>{status}</span>}
-        <button
-          onClick={() => setModelsOpen((o) => !o)}
-          title="run an open-source model"
-          className="hearth-act" style={{ ...ghostBtn, color: modelsOpen ? "var(--fg)" : "var(--fg-muted)", background: modelsOpen ? "var(--accent-soft)" : "transparent" }}
-        >
-          ✦ models
-        </button>
-        <button
-          onClick={() => setAgentsOpen((o) => !o)}
-          title="install a CLI agent"
-          className="hearth-act" style={{ ...ghostBtn, color: agentsOpen ? "var(--fg)" : "var(--fg-muted)", background: agentsOpen ? "var(--accent-soft)" : "transparent" }}
-        >
-          ◆ agents
-        </button>
-        <button onClick={() => setMachineOpen(true)} title="machine" className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
-          {machineState === "waking" || machineState === "provisioning" ? (
-            <span className="hearth-spin" style={{ width: 9, height: 9 }} />
-          ) : (
-            <span className={machineState === "running" ? "hearth-pulse" : undefined} style={{ width: 7, height: 7, borderRadius: 999, background: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", display: "inline-block" }} />
-          )}
-          <span style={{ color: "var(--fg-muted)" }}>{machineState || "machine"}</span>
-        </button>
-        <button onClick={() => setSettingsOpen(true)} title="settings" className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", padding: "4px 6px" }} aria-label="settings">
-          <GearIcon />
-        </button>
+
+        {/* right cluster — the app's controls, grouped as one quiet unit */}
+        <div style={rightCluster}>
+          <button
+            onClick={() => setModelsOpen((o) => !o)}
+            title="run an open-source model"
+            className="hearth-act" style={{ ...ghostBtn, color: modelsOpen ? "var(--fg)" : "var(--fg-muted)", background: modelsOpen ? "var(--accent-soft)" : "transparent" }}
+          >
+            ✦ models
+          </button>
+          <button
+            onClick={() => setAgentsOpen((o) => !o)}
+            title="install a CLI agent"
+            className="hearth-act" style={{ ...ghostBtn, color: agentsOpen ? "var(--fg)" : "var(--fg-muted)", background: agentsOpen ? "var(--accent-soft)" : "transparent" }}
+          >
+            ◆ agents
+          </button>
+          <span style={clusterDivider} />
+          <button onClick={() => setMachineOpen(true)} title="machine" className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
+            {machineState === "waking" || machineState === "provisioning" ? (
+              <span className="hearth-spin" style={{ width: 9, height: 9 }} />
+            ) : (
+              <span className={machineState === "running" ? "hearth-pulse" : undefined} style={{ width: 7, height: 7, borderRadius: 999, background: MACHINE_STATE_COLOR[machineState] ?? "var(--fg-subtle)", display: "inline-block" }} />
+            )}
+            <span style={{ color: "var(--fg-muted)" }}>{machineState || "machine"}</span>
+          </button>
+          <button onClick={() => setSettingsOpen(true)} title="settings" className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", padding: "4px 6px" }} aria-label="settings">
+            <GearIcon />
+          </button>
+        </div>
         {multiUser && me && (
           <div style={{ position: "relative" }}>
             <button onClick={() => setAcctMenu((o) => !o)} title={`signed in as ${me}`} className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
@@ -557,16 +562,32 @@ const MACHINE_STATE_COLOR: Record<string, string> = {
 };
 
 const headerStyle: React.CSSProperties = {
-  height: 40,
+  height: 44,
   display: "flex",
   alignItems: "center",
-  padding: "0 12px",
+  padding: "0 14px",
   gap: 4,
   borderBottom: "1px solid var(--border)",
   background: "var(--bg-glass)",
   backdropFilter: "blur(10px)",
   WebkitBackdropFilter: "blur(10px)",
   flexShrink: 0,
+};
+/* right-side controls grouped as one quiet unit */
+const rightCluster: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 2,
+  padding: 3,
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  background: "color-mix(in srgb, var(--bg-elevated) 55%, transparent)",
+};
+const clusterDivider: React.CSSProperties = {
+  width: 1,
+  height: 14,
+  background: "var(--border)",
+  margin: "0 3px",
 };
 const tabGlow: React.CSSProperties = {
   position: "absolute",
@@ -592,7 +613,7 @@ const tabChip: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 6,
-  padding: "3px 10px",
+  padding: "5px 11px",
   borderRadius: "var(--radius-sm)",
   border: "none",
   background: "transparent",
@@ -610,7 +631,7 @@ const wsMenuStyle: React.CSSProperties = {
   background: "var(--bg-elevated)",
   border: "1px solid var(--border-strong)",
   borderRadius: "var(--radius)",
-  boxShadow: "0 16px 40px rgba(0,0,0,0.3)",
+  boxShadow: "var(--shadow-md)",
   padding: 6,
 };
 const wsItem: React.CSSProperties = {

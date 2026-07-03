@@ -243,6 +243,12 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers, 
     ro.observe(containerRef.current);
 
     requestAnimationFrame(() => safeFit());
+    // The bundled mono font may land after the terminal opened — re-assigning
+    // fontFamily forces xterm to re-measure glyphs with the real font.
+    document.fonts?.ready.then(() => {
+      term.options.fontFamily = FONT_STACK;
+      safeFit();
+    });
     let fitted = false;
     const timer = setInterval(() => {
       if (!fitted) fitted = safeFit();

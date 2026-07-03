@@ -33,7 +33,7 @@ export default function CommandPalette({ commands, onClose }: { commands: Comman
   };
 
   return (
-    <div onClick={onClose} style={overlay}>
+    <div onClick={onClose} className="hearth-overlay-blur" style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={panel} className="hearth-fade">
         <input
           ref={inputRef}
@@ -100,7 +100,7 @@ const panel: React.CSSProperties = {
   background: "var(--bg-elevated)",
   border: "1px solid var(--border-strong)",
   borderRadius: "var(--radius)",
-  boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+  boxShadow: "var(--shadow-lg)",
   overflow: "hidden",
 };
 const input: React.CSSProperties = {
