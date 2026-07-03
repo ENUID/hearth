@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import TerminalTab from "./components/TerminalTab";
 import KeyBar from "./components/KeyBar";
 import CommandBar from "./components/CommandBar";
+import HearthMark from "./components/HearthMark";
 import Login from "./components/Login";
 import MachinePanel from "./components/MachinePanel";
 import SettingsPanel from "./components/SettingsPanel";
@@ -350,7 +351,7 @@ export default function App() {
       <div className="hearth-glowbar" />
       <div style={headerStyle}>
         <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <FlameMark />
+          <HearthMark size={18} />
           <span style={{ fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em", fontFamily: "var(--font-mono)", fontSize: 13 }}>hearth</span>
         </span>
 
@@ -525,23 +526,6 @@ export default function App() {
       {teamsOpen && <TeamsPanel me={me} onClose={() => setTeamsOpen(false)} onSwitchScope={switchScope} />}
       {billingOpen && <BillingPanel onClose={() => setBillingOpen(false)} />}
     </div>
-  );
-}
-
-function FlameMark() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id="hearthFlameGrad" x1="0" y1="24" x2="0" y2="0">
-          <stop offset="0%" style={{ stopColor: "var(--accent)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--accent-2)" }} />
-        </linearGradient>
-      </defs>
-      <path
-        fill="url(#hearthFlameGrad)"
-        d="M12 2c.6 2.6-.4 4.3-2 6-1.8 1.9-3 3.8-3 6.3A5 5 0 0 0 12 19a5 5 0 0 0 5-4.7c.1-1.7-.6-2.9-1.6-4 .1 1.6-.5 2.6-1.4 3.3-.3-1.6-1-2.4-2-3.3-1.1-1-1.4-2.3-1-3.8.9.4 1.6 1 2 2 .8-1.7.7-3.6-1-6.5Z"
-      />
-    </svg>
   );
 }
 

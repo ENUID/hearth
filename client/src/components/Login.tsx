@@ -1,5 +1,6 @@
 import { useState, FormEvent } from "react";
 import { login, signup } from "../lib/api";
+import HearthMark from "./HearthMark";
 
 export default function Login({ onAuthed, multiUser, instanceName = "hearth", signupsOpen = true }: { onAuthed: () => void; multiUser: boolean; instanceName?: string; signupsOpen?: boolean }) {
   const [username, setUsername] = useState("");
@@ -35,15 +36,7 @@ export default function Login({ onAuthed, multiUser, instanceName = "hearth", si
 
       {/* the mark, above the card — a moment, not a form */}
       <div className="hearth-rise" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, zIndex: 1 }}>
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ filter: "drop-shadow(0 0 14px var(--accent-glow))" }}>
-          <defs>
-            <linearGradient id="loginFlame" x1="0" y1="24" x2="0" y2="0">
-              <stop offset="0%" style={{ stopColor: "var(--accent)" }} />
-              <stop offset="100%" style={{ stopColor: "var(--accent-2)" }} />
-            </linearGradient>
-          </defs>
-          <path fill="url(#loginFlame)" d="M12 2c.6 2.6-.4 4.3-2 6-1.8 1.9-3 3.8-3 6.3A5 5 0 0 0 12 19a5 5 0 0 0 5-4.7c.1-1.7-.6-2.9-1.6-4 .1 1.6-.5 2.6-1.4 3.3-.3-1.6-1-2.4-2-3.3-1.1-1-1.4-2.3-1-3.8.9.4 1.6 1 2 2 .8-1.7.7-3.6-1-6.5Z" />
-        </svg>
+        <HearthMark size={46} glow />
         <div style={{ fontWeight: 600, color: "var(--fg)", fontFamily: "var(--font-mono)", fontSize: 22, letterSpacing: "-0.02em" }}>{instanceName}</div>
         <div style={{ color: "var(--fg-subtle)", fontSize: 12 }}>
           {multiUser ? (creating ? "create your account" : "sign in to your computer") : "your computer, in the browser"}
