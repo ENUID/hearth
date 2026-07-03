@@ -36,9 +36,11 @@ export const MODEL_CATALOG: ModelInfo[] = [
   { id: "gemma2:9b", name: "Gemma 2 9B", params: "9B", family: "Google Gemma", gpu: "a10g", sizeGb: 5.4, blurb: "Google's open model, solid all-rounder.", category: "chat", localTier: "heavy", mlcId: "gemma-2-9b-it-q4f16_1-MLC" },
   { id: "deepseek-r1:8b", name: "DeepSeek-R1 8B", params: "8B", family: "DeepSeek", gpu: "a10g", sizeGb: 4.9, blurb: "Reasoning model that thinks step by step.", category: "chat", localTier: "heavy", mlcId: "DeepSeek-R1-Distill-Llama-8B-q4f16_1-MLC" },
   { id: "hermes3:8b", name: "Hermes 3 8B", params: "8B", family: "Nous Research", gpu: "a10g", sizeGb: 4.7, blurb: "Steerable, candid fine-tune of Llama 3.1.", category: "chat", localTier: "heavy", mlcId: "Hermes-3-Llama-3.1-8B-q4f16_1-MLC" },
+  { id: "glm4:9b", name: "GLM-4 9B", params: "9B", family: "Zhipu AI", gpu: "a10g", sizeGb: 5.5, blurb: "Strong bilingual (EN/中文) chat, long context, tool use.", category: "chat", localTier: "none" },
   { id: "qwen2.5:72b", name: "Qwen2.5 72B", params: "72B", family: "Alibaba Qwen", gpu: "a100", sizeGb: 41, blurb: "Frontier-class. Top open model for code + reasoning.", category: "chat", localTier: "none" },
   { id: "llama3.3:70b", name: "Llama 3.3 70B", params: "70B", family: "Meta Llama", gpu: "a100", sizeGb: 40, blurb: "Meta's latest 70B — near-405B quality.", category: "chat", localTier: "none" },
   { id: "mixtral:8x7b", name: "Mixtral 8x7B", params: "47B MoE", family: "Mistral", gpu: "a100", sizeGb: 26, blurb: "Mixture-of-experts; fast for its strength.", category: "chat", localTier: "none" },
+  { id: "glm-4.5-air", name: "GLM-4.5 Air", params: "106B MoE (12B active)", family: "Zhipu AI", gpu: "a100", sizeGb: 60, blurb: "Zhipu's 2025 flagship-class MoE — built for agentic coding + tool use.", category: "chat", localTier: "none" },
   { id: "command-r-plus", name: "Command R+", params: "104B", family: "Cohere", gpu: "a100", sizeGb: 59, blurb: "Built for RAG and tool use.", category: "chat", localTier: "none" },
 
   // ---- Image generation ----

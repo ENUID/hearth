@@ -26,6 +26,8 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
   const [audPrompt, setAudPrompt] = useState("");
   const [aud, setAud] = useState<{ url: string; note?: string } | null>(null);
   const [audBusy, setAudBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  const [freeOnly, setFreeOnly] = useState(false);
   const localRef = useRef<Local | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   localRef.current = local;
@@ -180,8 +182,44 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
             Hearth runs chat models on <b>your device</b> when it can (free + private), and rents a GPU
             only when it must. Image / audio / video serve on a cloud GPU.
           </div>
+
+          <div style={{ display: "flex", gap: 6, position: "sticky", top: 0, background: "var(--bg-elevated)", zIndex: 1, paddingBottom: 4 }}>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`search ${snap.catalog.length} models…`}
+              style={searchInput}
+            />
+            <button
+              onClick={() => setFreeOnly((f) => !f)}
+              title="only models that run free, on your device"
+              style={{ ...freeToggle, ...(freeOnly ? freeToggleActive : {}) }}
+            >
+              on-device
+            </button>
+          </div>
+
+          {(() => {
+            const q = query.trim().toLowerCase();
+            const matches = (m: ModelInfo) =>
+              (!q || m.name.toLowerCase().includes(q) || m.family.toLowerCase().includes(q) || m.blurb.toLowerCase().includes(q)) &&
+              (!freeOnly || canRunLocally(m));
+            const anyMatch = snap.catalog.some(matches);
+            return !anyMatch ? (
+              <div style={{ fontSize: 12, color: "var(--fg-subtle)", padding: "16px 2px", textAlign: "center" }}>
+                No models match "{query}"{freeOnly ? " (on-device only)" : ""}.
+              </div>
+            ) : null;
+          })()}
+
           {CATEGORIES.map(({ key, label }) => {
-            const items = snap.catalog.filter((m) => m.category === key);
+            const q = query.trim().toLowerCase();
+            const items = snap.catalog.filter(
+              (m) =>
+                m.category === key &&
+                (!q || m.name.toLowerCase().includes(q) || m.family.toLowerCase().includes(q) || m.blurb.toLowerCase().includes(q)) &&
+                (!freeOnly || canRunLocally(m))
+            );
             if (!items.length) return null;
             return (
               <div key={key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -348,5 +386,8 @@ const headerBar: React.CSSProperties = { display: "flex", alignItems: "center", 
 const closeBtn: React.CSSProperties = { marginLeft: "auto", background: "transparent", border: "none", color: "var(--fg-muted)", cursor: "pointer", fontSize: 14 };
 const card: React.CSSProperties = { border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "10px 12px", background: "var(--bg)" };
 const badge: React.CSSProperties = { fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--fg-muted)", border: "1px solid var(--border-strong)", borderRadius: 4, padding: "1px 5px" };
+const searchInput: React.CSSProperties = { flex: 1, minWidth: 0, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--fg)", padding: "7px 9px", fontSize: 12, outline: "none" };
+const freeToggle: React.CSSProperties = { flexShrink: 0, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--fg-muted)", padding: "7px 10px", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" };
+const freeToggleActive: React.CSSProperties = { background: "var(--accent-soft)", borderColor: "var(--accent)", color: "var(--accent)" };
 const runBtn: React.CSSProperties = { flex: 1, background: "var(--accent)", color: "var(--bg)", border: "none", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
 const secondaryBtn: React.CSSProperties = { flex: 1, background: "transparent", color: "var(--fg)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" };

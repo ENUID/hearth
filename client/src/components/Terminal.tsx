@@ -295,6 +295,18 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers, 
         style={{ width: "100%", height: "100%", padding: "8px 4px 4px 8px", background: "var(--bg)" }}
       />
 
+      {/* ambient brand mark — sits in the corner, low-opacity, never in the
+          way of scrollback (bottom-right, behind where output accumulates). */}
+      <svg
+        width="140" height="140" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+        style={{ position: "absolute", right: 4, bottom: 4, opacity: 0.035, pointerEvents: "none" }}
+      >
+        <path
+          fill="var(--fg)"
+          d="M12 2c.6 2.6-.4 4.3-2 6-1.8 1.9-3 3.8-3 6.3A5 5 0 0 0 12 19a5 5 0 0 0 5-4.7c.1-1.7-.6-2.9-1.6-4 .1 1.6-.5 2.6-1.4 3.3-.3-1.6-1-2.4-2-3.3-1.1-1-1.4-2.3-1-3.8.9.4 1.6 1 2 2 .8-1.7.7-3.6-1-6.5Z"
+        />
+      </svg>
+
       {searchOpen && (
         <div
           style={{

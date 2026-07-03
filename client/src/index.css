@@ -160,3 +160,8 @@ button { font-family: inherit; }
 /* soft entrance for pills / chat rows */
 @keyframes hearthRise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .hearth-rise { animation: hearthRise 0.18s ease-out; }
+
+/* hide keyboard-shortcut hints on touch devices — there's no ⌘ key to press */
+@media (pointer: coarse) {
+  .hearth-desktop-only { display: none; }
+}

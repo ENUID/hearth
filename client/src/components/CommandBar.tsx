@@ -272,7 +272,9 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
                 </span>
               </span>
             ) : (
-              <span style={{ fontSize: 10, color: "var(--fg-subtle)", marginRight: 4 }}>↵ {isRun ? "run" : "send"} · ⇥ mode · ⌘J focus</span>
+              <span style={{ fontSize: 10, color: "var(--fg-subtle)", marginRight: 4 }}>
+                ↵ {isRun ? "run" : "send"} · ⇥ mode<span className="hearth-desktop-only"> · ⌘J focus</span>
+              </span>
             )}
             <button onClick={submit} disabled={busy || !value.trim()} style={{ ...sendBtn, opacity: busy || !value.trim() ? 0.4 : 1 }} aria-label={isRun ? "run" : "send"}>
               {isRun ? (
