@@ -356,7 +356,7 @@ export default function App() {
         {/* scope switcher (personal / team) */}
         {multiUser && (
           <div style={{ position: "relative", marginLeft: 8 }}>
-            <button onClick={() => setScopeMenu((o) => !o)} title="scope" style={{ ...ghostBtn, display: "flex", gap: 5, alignItems: "center" }}>
+            <button onClick={() => setScopeMenu((o) => !o)} title="scope" className="hearth-act" style={{ ...ghostBtn, display: "flex", gap: 5, alignItems: "center" }}>
               <span style={{ fontSize: 9, color: scope === "me" ? "var(--fg-subtle)" : "var(--accent)" }}>{scope === "me" ? "◐" : "◆"}</span>
               <span style={{ color: "var(--fg)" }}>{scopeLabel}</span>
               <span style={{ color: "var(--fg-subtle)", fontSize: 10 }}>▾</span>
@@ -365,11 +365,11 @@ export default function App() {
               <>
                 <div onClick={() => setScopeMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <div style={wsMenuStyle} className="hearth-fade">
-                  <button onClick={() => switchScope("me")} style={{ ...wsItem, color: scope === "me" ? "var(--fg)" : "var(--fg-muted)", background: scope === "me" ? "var(--accent-soft)" : "transparent" }}>Personal</button>
+                  <button onClick={() => switchScope("me")} className="hearth-act" style={{ ...wsItem, color: scope === "me" ? "var(--fg)" : "var(--fg-muted)", background: scope === "me" ? "var(--accent-soft)" : "transparent" }}>Personal</button>
                   {teams.map((t) => (
-                    <button key={t.id} onClick={() => switchScope(`team:${t.id}`)} style={{ ...wsItem, color: scope === `team:${t.id}` ? "var(--fg)" : "var(--fg-muted)", background: scope === `team:${t.id}` ? "var(--accent-soft)" : "transparent" }}>{t.name}</button>
+                    <button key={t.id} onClick={() => switchScope(`team:${t.id}`)} className="hearth-act" style={{ ...wsItem, color: scope === `team:${t.id}` ? "var(--fg)" : "var(--fg-muted)", background: scope === `team:${t.id}` ? "var(--accent-soft)" : "transparent" }}>{t.name}</button>
                   ))}
-                  <button onClick={() => { setScopeMenu(false); setTeamsOpen(true); }} style={{ ...wsItem, color: "var(--fg-muted)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>⚙ manage teams…</button>
+                  <button onClick={() => { setScopeMenu(false); setTeamsOpen(true); }} className="hearth-act" style={{ ...wsItem, color: "var(--fg-muted)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>⚙ manage teams…</button>
                 </div>
               </>
             )}
@@ -378,7 +378,7 @@ export default function App() {
 
         {/* workspace switcher */}
         <div style={{ position: "relative", marginLeft: 8 }}>
-          <button onClick={() => setWsMenu((o) => !o)} title="workspace" style={{ ...ghostBtn, display: "flex", gap: 5, alignItems: "center", fontFamily: "var(--font-mono)" }}>
+          <button onClick={() => setWsMenu((o) => !o)} title="workspace" className="hearth-act" style={{ ...ghostBtn, display: "flex", gap: 5, alignItems: "center", fontFamily: "var(--font-mono)" }}>
             <span style={{ color: "var(--fg)" }}>{activeWsName}</span>
             <span style={{ color: "var(--fg-subtle)", fontSize: 10 }}>▾</span>
           </button>
@@ -393,7 +393,7 @@ export default function App() {
                         setActiveWs(w.id);
                         setWsMenu(false);
                       }}
-                      style={{ ...wsItem, color: w.id === activeWs ? "var(--fg)" : "var(--fg-muted)", background: w.id === activeWs ? "var(--accent-soft)" : "transparent" }}
+                      className="hearth-act" style={{ ...wsItem, color: w.id === activeWs ? "var(--fg)" : "var(--fg-muted)", background: w.id === activeWs ? "var(--accent-soft)" : "transparent" }}
                     >
                       {w.name}
                     </button>
@@ -402,7 +402,7 @@ export default function App() {
                     )}
                   </div>
                 ))}
-                <button onClick={newWorkspace} style={{ ...wsItem, color: "var(--fg-muted)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>＋ new workspace</button>
+                <button onClick={newWorkspace} className="hearth-act" style={{ ...wsItem, color: "var(--fg-muted)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>＋ new workspace</button>
               </div>
             </>
           )}
@@ -415,32 +415,32 @@ export default function App() {
           {cur.tabs.map((t) => {
             const isActive = t.id === cur.active;
             return (
-              <button key={t.id} onClick={() => selectTab(t.id)} style={{ ...tabChip, position: "relative", color: isActive ? "var(--fg)" : "var(--fg-subtle)", background: isActive ? "var(--accent-soft)" : "transparent" }}>
+              <button key={t.id} onClick={() => selectTab(t.id)} className="hearth-act" style={{ ...tabChip, position: "relative", color: isActive ? "var(--fg)" : "var(--fg-subtle)", background: isActive ? "var(--accent-soft)" : "transparent" }}>
                 {t.title}
                 <span onClick={(e) => { e.stopPropagation(); closeTab(t.id); }} title="close tab" style={{ opacity: 0.5, fontSize: 13, lineHeight: 1 }}>×</span>
                 {isActive && <span style={tabGlow} />}
               </button>
             );
           })}
-          <button onClick={newTab} title="new tab" style={{ ...ghostBtn, fontSize: 15, padding: "2px 7px" }}>+</button>
+          <button onClick={newTab} title="new tab" className="hearth-act" style={{ ...ghostBtn, fontSize: 15, padding: "2px 7px" }}>+</button>
         </div>
 
         {status && <span style={{ color: "var(--fg-muted)", fontSize: 11, marginRight: 8 }}>{status}</span>}
         <button
           onClick={() => setModelsOpen((o) => !o)}
           title="run an open-source model"
-          style={{ ...ghostBtn, color: modelsOpen ? "var(--fg)" : "var(--fg-muted)", background: modelsOpen ? "var(--accent-soft)" : "transparent" }}
+          className="hearth-act" style={{ ...ghostBtn, color: modelsOpen ? "var(--fg)" : "var(--fg-muted)", background: modelsOpen ? "var(--accent-soft)" : "transparent" }}
         >
           ✦ models
         </button>
         <button
           onClick={() => setAgentsOpen((o) => !o)}
           title="install a CLI agent"
-          style={{ ...ghostBtn, color: agentsOpen ? "var(--fg)" : "var(--fg-muted)", background: agentsOpen ? "var(--accent-soft)" : "transparent" }}
+          className="hearth-act" style={{ ...ghostBtn, color: agentsOpen ? "var(--fg)" : "var(--fg-muted)", background: agentsOpen ? "var(--accent-soft)" : "transparent" }}
         >
           ◆ agents
         </button>
-        <button onClick={() => setMachineOpen(true)} title="machine" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
+        <button onClick={() => setMachineOpen(true)} title="machine" className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
           {machineState === "waking" || machineState === "provisioning" ? (
             <span className="hearth-spin" style={{ width: 9, height: 9 }} />
           ) : (
@@ -448,12 +448,12 @@ export default function App() {
           )}
           <span style={{ color: "var(--fg-muted)" }}>{machineState || "machine"}</span>
         </button>
-        <button onClick={() => setSettingsOpen(true)} title="settings" style={{ ...ghostBtn, display: "flex", alignItems: "center", padding: "4px 6px" }} aria-label="settings">
+        <button onClick={() => setSettingsOpen(true)} title="settings" className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", padding: "4px 6px" }} aria-label="settings">
           <GearIcon />
         </button>
         {multiUser && me && (
           <div style={{ position: "relative" }}>
-            <button onClick={() => setAcctMenu((o) => !o)} title={`signed in as ${me}`} style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={() => setAcctMenu((o) => !o)} title={`signed in as ${me}`} className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 18, height: 18, borderRadius: 999, background: "var(--accent-soft)", color: "var(--fg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{me.slice(0, 1)}</span>
               <span style={{ color: "var(--fg-muted)" }}>{me}</span>
             </button>
@@ -461,9 +461,9 @@ export default function App() {
               <>
                 <div onClick={() => setAcctMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <div style={{ ...wsMenuStyle, left: "auto", right: 0, minWidth: 190 }} className="hearth-fade">
-                  <button onClick={doChangePassword} style={{ ...wsItem, color: "var(--fg-muted)" }}>Change password…</button>
-                  <button onClick={() => { setAcctMenu(false); signOutAll(); }} style={{ ...wsItem, color: "var(--fg-muted)" }}>Sign out everywhere</button>
-                  <button onClick={signOut} style={{ ...wsItem, color: "var(--fg)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>Sign out</button>
+                  <button onClick={doChangePassword} className="hearth-act" style={{ ...wsItem, color: "var(--fg-muted)" }}>Change password…</button>
+                  <button onClick={() => { setAcctMenu(false); signOutAll(); }} className="hearth-act" style={{ ...wsItem, color: "var(--fg-muted)" }}>Sign out everywhere</button>
+                  <button onClick={signOut} className="hearth-act" style={{ ...wsItem, color: "var(--fg)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>Sign out</button>
                 </div>
               </>
             )}

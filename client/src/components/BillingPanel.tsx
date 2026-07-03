@@ -38,7 +38,7 @@ export default function BillingPanel({ onClose }: { onClose: () => void }) {
       <div style={sheet} className="hearth-fade" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg)" }}>usage &amp; billing</span>
-          <button onClick={onClose} style={closeBtn} aria-label="close" tabIndex={-1}>✕</button>
+          <button onClick={onClose} className="hearth-act" style={closeBtn} aria-label="close" tabIndex={-1}>✕</button>
         </div>
 
         {!sum ? (

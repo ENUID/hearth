@@ -54,7 +54,7 @@ export default function TeamsPanel({ me, onClose, onSwitchScope }: { me: string 
       <div style={sheet} className="hearth-fade" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg)" }}>teams</span>
-          <button onClick={onClose} style={closeBtn} aria-label="close" tabIndex={-1}>✕</button>
+          <button onClick={onClose} className="hearth-act" style={closeBtn} aria-label="close" tabIndex={-1}>✕</button>
         </div>
 
         <div style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 12, lineHeight: 1.5 }}>
@@ -98,7 +98,7 @@ export default function TeamsPanel({ me, onClose, onSwitchScope }: { me: string 
                   <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                     <input value={invite[t.id] ?? ""} onChange={(e) => setInvite((p) => ({ ...p, [t.id]: e.target.value }))} placeholder="invite by username"
                       onKeyDown={(e) => { if (e.key === "Enter") doInvite(t); }} style={field} />
-                    <button onClick={() => doInvite(t)} style={miniBtn}>Invite</button>
+                    <button onClick={() => doInvite(t)} className="hearth-act" style={miniBtn}>Invite</button>
                   </div>
                 )}
                 {mine && (
@@ -111,7 +111,7 @@ export default function TeamsPanel({ me, onClose, onSwitchScope }: { me: string 
 
         <form onSubmit={doCreate} style={{ display: "flex", gap: 6, marginTop: 12 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="new team name" style={field} />
-          <button type="submit" style={primaryBtn}>Create</button>
+          <button type="submit" className="hearth-act hearth-act-primary" style={primaryBtn}>Create</button>
         </form>
         {msg && <div style={{ color: "var(--accent)", fontSize: 12, marginTop: 8 }}>{msg}</div>}
       </div>

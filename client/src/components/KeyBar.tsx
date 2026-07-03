@@ -63,6 +63,7 @@ export default function KeyBar({ onSend, mods, onToggleCtrl, onToggleAlt }: Prop
           <button
             key={key.label}
             tabIndex={-1}
+            className="hearth-act"
             onPointerDown={(e) => press(e, key)}
             style={{
               flex: "0 0 auto",

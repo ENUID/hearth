@@ -8,6 +8,7 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
+          className="hearth-act"
           style={{
             flex: 1,
             padding: "7px 8px",
@@ -34,10 +35,10 @@ export default function SettingsPanel({ onClose, commands = [] }: { onClose: () 
   const actions = commands.filter((c) => c.id !== "settings" && c.id !== "theme");
   return (
     <div onClick={onClose} style={overlay}>
-      <div onClick={(e) => e.stopPropagation()} style={drawer}>
+      <div onClick={(e) => e.stopPropagation()} className="hearth-drawer" style={drawer}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
           <h2 style={{ fontSize: 15, fontFamily: "var(--font-mono)", color: "var(--fg)" }}>settings</h2>
-          <button onClick={onClose} style={closeBtn} tabIndex={-1}>✕</button>
+          <button onClick={onClose} className="hearth-act" style={closeBtn} tabIndex={-1}>✕</button>
         </div>
 
         {actions.length > 0 && (
@@ -51,7 +52,7 @@ export default function SettingsPanel({ onClose, commands = [] }: { onClose: () 
                     onClose();
                     c.run();
                   }}
-                  style={actionRow}
+                  className="hearth-act" style={actionRow}
                 >
                   <span>{c.title}</span>
                   {c.hint && <span style={{ fontSize: 11, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>{c.hint}</span>}
@@ -70,9 +71,9 @@ export default function SettingsPanel({ onClose, commands = [] }: { onClose: () 
 
         <div style={section}>font size</div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button style={stepBtn} onClick={() => setSettings({ fontSize: Math.max(9, s.fontSize - 1) })}>−</button>
+          <button className="hearth-act" style={stepBtn} onClick={() => setSettings({ fontSize: Math.max(9, s.fontSize - 1) })}>−</button>
           <span style={{ fontFamily: "var(--font-mono)", minWidth: 40, textAlign: "center" }}>{s.fontSize}px</span>
-          <button style={stepBtn} onClick={() => setSettings({ fontSize: Math.min(28, s.fontSize + 1) })}>＋</button>
+          <button className="hearth-act" style={stepBtn} onClick={() => setSettings({ fontSize: Math.min(28, s.fontSize + 1) })}>＋</button>
         </div>
 
         <div style={section}>cursor</div>

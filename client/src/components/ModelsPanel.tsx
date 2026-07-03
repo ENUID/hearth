@@ -165,13 +165,13 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
   const chatEnabled = isChat && (localReady || (!local && cloud?.status === "running"));
 
   return (
-    <div style={panel}>
+    <div className="hearth-slide-in" style={panel}>
       <div style={headerBar}>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg)" }}>models</span>
         <span style={{ fontSize: 10, color: "var(--fg-subtle)", marginLeft: 8 }}>
           {webgpuAvailable() ? "device-capable" : "cloud only"}
         </span>
-        <button onClick={onClose} style={closeBtn} tabIndex={-1}>✕</button>
+        <button onClick={onClose} className="hearth-act" style={closeBtn} tabIndex={-1}>✕</button>
       </div>
 
       {!snap ? (
@@ -188,11 +188,11 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`search ${snap.catalog.length} models…`}
-              style={searchInput}
+              className="hearth-input" style={searchInput}
             />
             <button
               onClick={() => setFreeOnly((f) => !f)}
-              title="only models that run free, on your device"
+              className="hearth-act" title="only models that run free, on your device"
               style={{ ...freeToggle, ...(freeOnly ? freeToggleActive : {}) }}
             >
               on-device
@@ -227,7 +227,7 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
                 {items.map((m) => {
                   const localOk = canRunLocally(m);
                   return (
-                    <div key={m.id} style={card}>
+                    <div key={m.id} className="hearth-card" style={card}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                         <span style={{ fontWeight: 600, color: "var(--fg)" }}>{m.name}</span>
                         <span style={{ fontSize: 10, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>{m.params}</span>
@@ -237,8 +237,8 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
                       </div>
                       <div style={{ fontSize: 12, color: "var(--fg-muted)", margin: "4px 0 8px" }}>{m.blurb}</div>
                       <div style={{ display: "flex", gap: 6 }}>
-                        {localOk && <button disabled={busy} onClick={() => runLocal(m)} style={runBtn}>Run here (free)</button>}
-                        <button disabled={busy} onClick={() => runCloud(m)} style={localOk ? secondaryBtn : runBtn}>
+                        {localOk && <button disabled={busy} onClick={() => runLocal(m)} className="hearth-act hearth-act-primary" style={runBtn}>Run here (free)</button>}
+                        <button disabled={busy} onClick={() => runCloud(m)} className={localOk ? "hearth-act" : "hearth-act hearth-act-primary"} style={localOk ? secondaryBtn : runBtn}>
                           {m.gpu === "cpu" ? "Run in cloud" : `Run on ${gpuBadge[m.gpu]}`}
                         </button>
                       </div>

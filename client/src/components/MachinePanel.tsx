@@ -58,12 +58,12 @@ export default function MachinePanel({ onClose, ws = "workspace" }: { onClose: (
 
   return (
     <div onClick={onClose} style={overlay}>
-      <div onClick={(e) => e.stopPropagation()} style={drawer}>
+      <div onClick={(e) => e.stopPropagation()} className="hearth-drawer" style={drawer}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
           <h2 style={{ fontSize: 16, fontFamily: "var(--font-mono)", color: "var(--fg)" }}>
             machine <span style={{ color: "var(--fg-subtle)", fontSize: 12 }}>· {ws}</span>
           </h2>
-          <button onClick={onClose} style={{ ...btn, marginLeft: "auto" }} tabIndex={-1}>✕</button>
+          <button onClick={onClose} className="hearth-act" style={{ ...btn, marginLeft: "auto" }} tabIndex={-1}>✕</button>
         </div>
 
         {!snap ? (
@@ -91,7 +91,7 @@ export default function MachinePanel({ onClose, ws = "workspace" }: { onClose: (
                   key={key}
                   disabled={busy}
                   onClick={() => act(() => resizeMachine(key, ws), `resizing to ${t.label}…`)}
-                  style={{ ...chip, flex: 1, ...(m!.tier === key ? activeChip : {}) }}
+                  className="hearth-act" style={{ ...chip, flex: 1, ...(m!.tier === key ? activeChip : {}) }}
                 >
                   <div style={{ fontWeight: 600 }}>{t.label}</div>
                   <div style={{ fontSize: 10, opacity: 0.8 }}>{t.resources.cpu} CPU</div>
@@ -108,14 +108,14 @@ export default function MachinePanel({ onClose, ws = "workspace" }: { onClose: (
                   <span style={label}>{gpu!.spec.label}</span>
                   <span>{gpu!.state === "provisioning" ? "provisioning…" : `${gpu!.spec.vramGb} GB · ${usd(gpu!.spec.hourlyCents)}/hr`}</span>
                 </div>
-                <button disabled={busy} onClick={() => act(() => releaseGpu(ws), "releasing GPU…")} style={{ ...btn, width: "100%", marginTop: 6 }}>
+                <button disabled={busy} onClick={() => act(() => releaseGpu(ws), "releasing GPU…")} className="hearth-act" style={{ ...btn, width: "100%", marginTop: 6 }}>
                   release GPU
                 </button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 6 }}>
                 {Object.entries(snap.gpuCatalog).map(([key, g]) => (
-                  <button key={key} disabled={busy} onClick={() => act(() => provisionGpu(key, ws), `provisioning ${g.label}…`)} style={{ ...chip, flex: 1 }}>
+                  <button key={key} disabled={busy} onClick={() => act(() => provisionGpu(key, ws), `provisioning ${g.label}…`)} className="hearth-act" style={{ ...chip, flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>{g.type.toUpperCase()}</div>
                     <div style={{ fontSize: 10, opacity: 0.8 }}>{g.vramGb} GB</div>
                     <div style={{ fontSize: 10, opacity: 0.8 }}>{usd(g.hourlyCents)}/hr</div>
@@ -135,9 +135,9 @@ export default function MachinePanel({ onClose, ws = "workspace" }: { onClose: (
             {/* actions */}
             <div style={{ display: "flex", gap: 6, marginTop: 16 }}>
               {m!.state === "asleep" ? (
-                <button disabled={busy} onClick={() => act(() => wakeMachine(ws), "waking…")} style={{ ...btn, flex: 1 }}>wake</button>
+                <button disabled={busy} onClick={() => act(() => wakeMachine(ws), "waking…")} className="hearth-act" style={{ ...btn, flex: 1 }}>wake</button>
               ) : (
-                <button disabled={busy} onClick={() => act(() => sleepMachine(ws), "sleeping…")} style={{ ...btn, flex: 1 }}>sleep now</button>
+                <button disabled={busy} onClick={() => act(() => sleepMachine(ws), "sleeping…")} className="hearth-act" style={{ ...btn, flex: 1 }}>sleep now</button>
               )}
               <button
                 disabled={busy}
@@ -152,7 +152,7 @@ export default function MachinePanel({ onClose, ws = "workspace" }: { onClose: (
                     setBusy(false);
                   }
                 }}
-                style={{ ...btn, flex: 1 }}
+                className="hearth-act" style={{ ...btn, flex: 1 }}
               >
                 pay now
               </button>

@@ -45,13 +45,25 @@ const CMDS = new Set([
   "claude","aider","codex","goose","gemini","opencode","interpreter","openhands",
 ]);
 
+// Openers that read as natural language — a question or a request for the AI.
+const ASK_WORDS =
+  /^(how|what|why|when|where|who|whose|which|can|could|would|should|shall|may|might|is|are|am|was|were|do|does|did|will|explain|write|tell|help|show|give|create|generate|summarize|summarise|translate|describe|compare|suggest|recommend|draft|plan|brainstorm|fix|improve|review|rewrite|refactor|please|hey|hi|hello)\b/i;
+
 function detectMode(s: string): Mode {
   const t = s.trim();
   if (!t) return "ask";
+  // unmistakably shell
   if (t.startsWith("$") || t.startsWith("./") || t.startsWith("~/") || t.startsWith("/")) return "run";
   if (/[|;<>`]|&&|\$\(/.test(t)) return "run";
+  if (t.endsWith("?")) return "ask";
   if (CMDS.has(t.split(/\s+/)[0].toLowerCase())) return "run";
-  return "ask";
+  if (ASK_WORDS.test(t)) return "ask";
+  // sentence-shaped input (several words, nothing flag/path-like) reads as a
+  // question; anything else defaults to RUN — so any CLI you install works
+  // from the prompt without being on a list. Tab always overrides.
+  const flaggy = /(^|\s)-{1,2}[a-zA-Z]|[=/\\]/.test(t);
+  if (t.split(/\s+/).length >= 4 && !flaggy) return "ask";
+  return "run";
 }
 
 /** Pull a runnable command out of an AI reply (```fence``` or a `$ line`). */
@@ -225,7 +237,7 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
       <div style={dock}>
         <div className="hearth-cmdbar" style={promptBox}>
           {suggested && (
-            <button className="hearth-rise" onClick={() => { runCmd(suggested + "\r"); setSuggested(null); }} style={suggestChip} title="run the AI's suggested command">
+            <button className="hearth-rise hearth-act" onClick={() => { runCmd(suggested + "\r"); setSuggested(null); }} style={suggestChip} title="run the AI's suggested command">
               <span style={{ color: "var(--accent)" }}>▶</span>
               <code style={{ fontFamily: "var(--font-mono)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{suggested}</code>
               <span onClick={(e) => { e.stopPropagation(); setSuggested(null); }} style={{ color: "var(--fg-subtle)", marginLeft: 4 }}>✕</span>
@@ -253,7 +265,7 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
               type="button"
               onClick={onOpenModels}
               title={runningModel && modelBackend === "stub" ? "demo backend — replies are placeholders until a real model server (ollama / http) is configured" : "models"}
-              className={runningModel && !busy ? "hearth-pill-live" : undefined}
+              className={"hearth-act" + (runningModel && !busy ? " hearth-pill-live" : "")}
               style={modelChip}
             >
               <span style={{ color: runningModel ? "var(--accent)" : "var(--fg-subtle)", fontSize: 10 }}>✦</span>
@@ -276,7 +288,7 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
                 ↵ {isRun ? "run" : "send"} · ⇥ mode<span className="hearth-desktop-only"> · ⌘J focus</span>
               </span>
             )}
-            <button onClick={submit} disabled={busy || !value.trim()} style={{ ...sendBtn, opacity: busy || !value.trim() ? 0.4 : 1 }} aria-label={isRun ? "run" : "send"}>
+            <button onClick={submit} disabled={busy || !value.trim()} className="hearth-act hearth-act-primary" style={{ ...sendBtn, opacity: busy || !value.trim() ? 0.4 : 1 }} aria-label={isRun ? "run" : "send"}>
               {isRun ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
               ) : (

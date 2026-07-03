@@ -45,7 +45,7 @@ export default function Login({ onAuthed, multiUser, instanceName = "hearth", si
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            style={field}
+            className="hearth-input" style={field}
           />
         )}
         <input
@@ -54,12 +54,12 @@ export default function Login({ onAuthed, multiUser, instanceName = "hearth", si
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder={multiUser && creating ? "password (6+ characters)" : "password"}
-          style={field}
+          className="hearth-input" style={field}
         />
 
         {error && <div style={{ color: "var(--danger)", fontSize: 12 }}>{error}</div>}
 
-        <button type="submit" disabled={busy || !canSubmit} style={{ ...primary, opacity: busy || !canSubmit ? 0.5 : 1 }}>
+        <button type="submit" disabled={busy || !canSubmit} className="hearth-act hearth-act-primary" style={{ ...primary, opacity: busy || !canSubmit ? 0.5 : 1 }}>
           {busy ? "…" : multiUser ? (creating ? "Create account" : "Sign in") : "Enter"}
         </button>
 

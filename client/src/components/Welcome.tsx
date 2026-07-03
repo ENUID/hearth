@@ -16,7 +16,7 @@ export default function Welcome({
   return (
     <div style={overlay} onClick={onClose}>
       <div style={sheet} className="hearth-fade" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} style={closeBtn} aria-label="close" tabIndex={-1}>✕</button>
+        <button onClick={onClose} className="hearth-act" style={closeBtn} aria-label="close" tabIndex={-1}>✕</button>
 
         <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-subtle)", letterSpacing: "0.04em" }}>HEARTH</div>
         <h1 style={{ fontSize: 26, fontWeight: 650, color: "var(--fg)", margin: "8px 0 6px", letterSpacing: "-0.02em" }}>
@@ -52,7 +52,7 @@ export default function Welcome({
           />
         </div>
 
-        <button onClick={onClose} style={cta}>Start using Hearth →</button>
+        <button onClick={onClose} className="hearth-act hearth-act-primary" style={cta}>Start using Hearth →</button>
       </div>
     </div>
   );
@@ -67,7 +67,7 @@ function Step({ n, title, body, action }: { n: string; title: string; body: stri
         <div style={{ fontSize: 12.5, color: "var(--fg-muted)", lineHeight: 1.5, marginTop: 2 }}>{body}</div>
       </div>
       {action && (
-        <button onClick={action.run} style={stepBtn}>{action.label}</button>
+        <button onClick={action.run} className="hearth-act" style={stepBtn}>{action.label}</button>
       )}
     </div>
   );

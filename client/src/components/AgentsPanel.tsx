@@ -39,11 +39,11 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
   }
 
   return (
-    <div style={panel}>
+    <div className="hearth-slide-in" style={panel}>
       <div style={headerBar}>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg)" }}>agents</span>
         <span style={{ fontSize: 10, color: "var(--fg-subtle)", marginLeft: 8 }}>CLI agents, one tap</span>
-        <button onClick={onClose} style={closeBtn} tabIndex={-1}>✕</button>
+        <button onClick={onClose} className="hearth-act" style={closeBtn} tabIndex={-1}>✕</button>
       </div>
 
       {!snap ? (
@@ -58,7 +58,7 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
             const canFree = a.brain !== "byok";
             const isIn = installed[a.id];
             return (
-              <div key={a.id} style={card}>
+              <div key={a.id} className="hearth-card" style={card}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, color: "var(--fg)" }}>{a.name}</span>
                   <span style={{ fontSize: 10, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>{a.vendor}</span>
@@ -71,17 +71,17 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                   {isIn ? (
                     canFree ? (
-                      <button onClick={() => run(FREE_PREFIX + a.run)} style={runBtn} title="run pointed at your free Hearth model">
+                      <button onClick={() => run(FREE_PREFIX + a.run)} className="hearth-act hearth-act-primary" style={runBtn} title="run pointed at your free Hearth model">
                         Run · free model
                       </button>
                     ) : (
-                      <button onClick={() => run(a.run)} style={runBtn}>Run</button>
+                      <button onClick={() => run(a.run)} className="hearth-act hearth-act-primary" style={runBtn}>Run</button>
                     )
                   ) : (
                     <>
-                      <button onClick={() => install(a)} style={runBtn}>Install</button>
+                      <button onClick={() => install(a)} className="hearth-act hearth-act-primary" style={runBtn}>Install</button>
                       {canFree && (
-                        <button onClick={() => run(FREE_PREFIX + a.run)} style={secondaryBtn} title="run pointed at your free Hearth model">
+                        <button onClick={() => run(FREE_PREFIX + a.run)} className="hearth-act" style={secondaryBtn} title="run pointed at your free Hearth model">
                           Run · free model
                         </button>
                       )}
