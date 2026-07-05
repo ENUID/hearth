@@ -218,3 +218,20 @@ button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* left sidebar — workspace navigation */
+.hearth-sidebar { animation: hearthSidebarIn 0.16s ease-out; }
+@keyframes hearthSidebarIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+.hearth-ws-row:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.hearth-ws-row:hover.hearth-ws-row { }
+.hearth-ws-del { opacity: 0; transition: opacity 0.12s ease; }
+.hearth-ws-row:hover .hearth-ws-del { opacity: 1; }
+
+/* on narrow screens the sidebar overlays the app instead of taking a column */
+@media (max-width: 760px) {
+  .hearth-sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 60;
+    box-shadow: var(--shadow-lg);
+    background: var(--bg-elevated);
+  }
+}

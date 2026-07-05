@@ -3,6 +3,7 @@ import TerminalTab from "./components/TerminalTab";
 import KeyBar from "./components/KeyBar";
 import CommandBar from "./components/CommandBar";
 import HearthMark from "./components/HearthMark";
+import Sidebar from "./components/Sidebar";
 import Login from "./components/Login";
 import MachinePanel from "./components/MachinePanel";
 import SettingsPanel from "./components/SettingsPanel";
@@ -67,14 +68,12 @@ export default function App() {
     logout();
     window.location.reload();
   }, []);
-  const [acctMenu, setAcctMenu] = useState(false);
   const signOutAll = useCallback(async () => {
     await signOutEverywhere().catch(() => {});
     logout();
     window.location.reload();
   }, []);
   const doChangePassword = useCallback(async () => {
-    setAcctMenu(false);
     const current = window.prompt("Current password");
     if (!current) return;
     const next = window.prompt("New password (6+ characters)");
@@ -91,7 +90,6 @@ export default function App() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [billingOpen, setBillingOpen] = useState(false);
-  const [scopeMenu, setScopeMenu] = useState(false);
   const scope = getScope();
   const loadTeams = useCallback(() => {
     getTeams().then((r) => setTeams(r.teams)).catch(() => {});
@@ -192,7 +190,6 @@ export default function App() {
     });
     setTabsByWs((prev) => ({ ...prev, [id]: freshWsState() }));
     setActiveWs(id);
-    setWsMenu(false);
   }, []);
   const closeWorkspace = useCallback(
     (id: string) => {
@@ -309,7 +306,21 @@ export default function App() {
     setWelcomeOpen(false);
     try { localStorage.setItem("hearth_onboarded", "1"); } catch { /* ignore */ }
   }, []);
-  const [wsMenu, setWsMenu] = useState(false);
+  // --- left sidebar (workspace navigation) ---
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 760);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("hearth_sidebar");
+      if (saved !== null) return saved === "1";
+    } catch { /* ignore */ }
+    return typeof window !== "undefined" && window.innerWidth >= 760; // open on desktop, closed on phones
+  });
+  useEffect(() => { try { localStorage.setItem("hearth_sidebar", sidebarOpen ? "1" : "0"); } catch { /* ignore */ } }, [sidebarOpen]);
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 760);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const cycleTheme = useCallback(() => {
     const order = ["system", "light", "dark"] as const;
     setSettings({ theme: order[(order.indexOf(settings.theme) + 1) % order.length] });
@@ -344,73 +355,48 @@ export default function App() {
   if (!authResolved) return null;
   if (needsLogin) return <Login onAuthed={onAuthed} multiUser={multiUser} instanceName={instance.name} signupsOpen={instance.signupsOpen} />;
 
-  const activeWsName = workspaces.find((w) => w.id === activeWs)?.name ?? activeWs;
 
   return (
-    <div ref={rootRef} style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+    <div ref={rootRef} style={{ height: "100dvh", display: "flex", flexDirection: "row", background: "var(--bg)" }}>
+      {sidebarOpen && (
+        <Sidebar
+          instanceName={instance.name}
+          workspaces={workspaces}
+          activeWs={activeWs}
+          activeWsMachineState={machineState}
+          onSelectWs={(id) => { setActiveWs(id); if (isNarrow) setSidebarOpen(false); }}
+          onNewWs={newWorkspace}
+          onDeleteWs={closeWorkspace}
+          onCollapse={() => setSidebarOpen(false)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenMachine={() => setMachineOpen(true)}
+          multiUser={multiUser}
+          me={me}
+          scope={scope}
+          scopeLabel={scopeLabel}
+          teams={teams}
+          onSwitchScope={switchScope}
+          onManageTeams={() => setTeamsOpen(true)}
+          onChangePassword={doChangePassword}
+          onSignOutAll={signOutAll}
+          onSignOut={signOut}
+        />
+      )}
+      {sidebarOpen && isNarrow && <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 55 }} />}
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, position: "relative" }}>
       <div className="hearth-glowbar" />
       <div style={headerStyle}>
-        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <HearthMark size={18} />
-          <span style={{ fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em", fontFamily: "var(--font-mono)", fontSize: 13 }}>hearth</span>
-        </span>
-
-        {/* scope switcher (personal / team) */}
-        {multiUser && (
-          <div style={{ position: "relative", marginLeft: 8 }}>
-            <button onClick={() => setScopeMenu((o) => !o)} title="scope" className="hearth-act" style={{ ...ghostBtn, display: "flex", gap: 5, alignItems: "center" }}>
-              <span style={{ fontSize: 9, color: scope === "me" ? "var(--fg-subtle)" : "var(--accent)" }}>{scope === "me" ? "◐" : "◆"}</span>
-              <span style={{ color: "var(--fg)" }}>{scopeLabel}</span>
-              <span style={{ color: "var(--fg-subtle)", fontSize: 10 }}>▾</span>
-            </button>
-            {scopeMenu && (
-              <>
-                <div onClick={() => setScopeMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                <div style={wsMenuStyle} className="hearth-fade">
-                  <button onClick={() => switchScope("me")} className="hearth-act" style={{ ...wsItem, color: scope === "me" ? "var(--fg)" : "var(--fg-muted)", background: scope === "me" ? "var(--accent-soft)" : "transparent" }}>Personal</button>
-                  {teams.map((t) => (
-                    <button key={t.id} onClick={() => switchScope(`team:${t.id}`)} className="hearth-act" style={{ ...wsItem, color: scope === `team:${t.id}` ? "var(--fg)" : "var(--fg-muted)", background: scope === `team:${t.id}` ? "var(--accent-soft)" : "transparent" }}>{t.name}</button>
-                  ))}
-                  <button onClick={() => { setScopeMenu(false); setTeamsOpen(true); }} className="hearth-act" style={{ ...wsItem, color: "var(--fg-muted)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>⚙ manage teams…</button>
-                </div>
-              </>
-            )}
-          </div>
+        <button onClick={() => setSidebarOpen((o) => !o)} title="toggle sidebar" className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", padding: "4px 6px" }} aria-label="toggle sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+        </button>
+        {!sidebarOpen && (
+          <span style={{ display: "flex", alignItems: "center", gap: 7, marginRight: 2 }}>
+            <HearthMark size={18} />
+            <span style={{ fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em", fontFamily: "var(--font-mono)", fontSize: 13 }}>hearth</span>
+          </span>
         )}
-
-        {/* workspace switcher */}
-        <div style={{ position: "relative", marginLeft: 8 }}>
-          <button onClick={() => setWsMenu((o) => !o)} title="workspace" className="hearth-act" style={{ ...ghostBtn, display: "flex", gap: 5, alignItems: "center", fontFamily: "var(--font-mono)" }}>
-            <span style={{ color: "var(--fg)" }}>{activeWsName}</span>
-            <span style={{ color: "var(--fg-subtle)", fontSize: 10 }}>▾</span>
-          </button>
-          {wsMenu && (
-            <>
-              <div onClick={() => setWsMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div style={wsMenuStyle} className="hearth-fade">
-                {workspaces.map((w) => (
-                  <div key={w.id} style={{ display: "flex", alignItems: "center" }}>
-                    <button
-                      onClick={() => {
-                        setActiveWs(w.id);
-                        setWsMenu(false);
-                      }}
-                      className="hearth-act" style={{ ...wsItem, color: w.id === activeWs ? "var(--fg)" : "var(--fg-muted)", background: w.id === activeWs ? "var(--accent-soft)" : "transparent" }}
-                    >
-                      {w.name}
-                    </button>
-                    {workspaces.length > 1 && (
-                      <span onClick={() => closeWorkspace(w.id)} title="delete workspace" style={{ color: "var(--fg-subtle)", cursor: "pointer", padding: "0 8px", fontSize: 13 }}>×</span>
-                    )}
-                  </div>
-                ))}
-                <button onClick={newWorkspace} className="hearth-act" style={{ ...wsItem, color: "var(--fg-muted)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>＋ new workspace</button>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 8px" }} />
+        <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 6px" }} />
 
         {/* tabs for the active workspace */}
         <div style={{ display: "flex", alignItems: "center", gap: 2, overflowX: "auto", flex: 1 }}>
@@ -458,25 +444,6 @@ export default function App() {
             <GearIcon />
           </button>
         </div>
-        {multiUser && me && (
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setAcctMenu((o) => !o)} title={`signed in as ${me}`} className="hearth-act" style={{ ...ghostBtn, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 18, height: 18, borderRadius: 999, background: "var(--accent-soft)", color: "var(--fg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{me.slice(0, 1)}</span>
-              <span style={{ color: "var(--fg-muted)" }}>{me}</span>
-            </button>
-            {acctMenu && (
-              <>
-                <div onClick={() => setAcctMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                <div style={{ ...wsMenuStyle, left: "auto", right: 0, minWidth: 190 }} className="hearth-fade">
-                  <button onClick={doChangePassword} className="hearth-act" style={{ ...wsItem, color: "var(--fg-muted)" }}>Change password…</button>
-                  <button onClick={() => { setAcctMenu(false); signOutAll(); }} className="hearth-act" style={{ ...wsItem, color: "var(--fg-muted)" }}>Sign out everywhere</button>
-                  <button onClick={signOut} className="hearth-act" style={{ ...wsItem, color: "var(--fg)", borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 8 }}>Sign out</button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
       </div>
 
       {/* one window: terminal + AI conversation + composer, for the active workspace */}
@@ -513,6 +480,8 @@ export default function App() {
       </div>
 
       {showKeyBar && <KeyBar onSend={sendToActive} mods={mods} onToggleCtrl={toggleCtrl} onToggleAlt={toggleAlt} />}
+      </div>{/* end main column */}
+
       {machineOpen && <MachinePanel ws={activeWs} onClose={() => setMachineOpen(false)} />}
       {settingsOpen && <SettingsPanel commands={commands} onClose={() => setSettingsOpen(false)} />}
       {paletteOpen && <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />}
@@ -606,29 +575,4 @@ const tabChip: React.CSSProperties = {
   fontSize: 12,
   cursor: "pointer",
   whiteSpace: "nowrap",
-};
-const wsMenuStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 30,
-  left: 0,
-  zIndex: 41,
-  minWidth: 180,
-  background: "var(--bg-elevated)",
-  border: "1px solid var(--border-strong)",
-  borderRadius: "var(--radius)",
-  boxShadow: "var(--shadow-md)",
-  padding: 6,
-};
-const wsItem: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  textAlign: "left",
-  background: "transparent",
-  border: "none",
-  borderRadius: "var(--radius-sm)",
-  color: "var(--fg)",
-  cursor: "pointer",
-  fontSize: 13,
-  fontFamily: "var(--font-mono)",
-  padding: "7px 10px",
 };
