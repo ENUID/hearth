@@ -1,18 +1,9 @@
 import { useId } from "react";
 
-// The Hearth mark — "the burning cursor". A terminal block cursor whose top
-// edge burns into two flame tongues, an underscore prompt cut into its base,
-// and pixel-square sparks rising like embers. Terminal + fire in one shape.
-export const MARK_PATH =
-  "M15.4 42 Q12 42 12 38.6 L12 22.4 " +
-  "C12 19.4 12.7 17.5 14.3 15.8 C14.4 12.4 15.3 10.2 17.1 8 " +
-  "C17.9 11 19 13.6 20.8 15.9 C23.5 12.6 25.7 7.6 25.3 2.4 " +
-  "C29 6.2 31.3 11.4 31.7 15.4 C34.4 16.8 36 18.7 36 21.8 " +
-  "L36 38.6 Q36 42 32.6 42 Z " +
-  // the underscore prompt, cut out of the block (fill-rule: evenodd)
-  "M18.6 33.2 Q17 33.2 17 34.8 L17 35.2 Q17 36.8 18.6 36.8 " +
-  "L29.4 36.8 Q31 36.8 31 35.2 L31 34.8 Q31 33.2 29.4 33.2 Z";
-
+// The Hearth mark — a minimal terminal window with an ember prompt. A rounded
+// window frame, a hairline title rail, a ">" caret and a lit cursor: the web
+// terminal, distilled to one glyph. Ember gradient by default; pass `mono` for
+// a single-colour rendering (watermarks).
 type Props = {
   size?: number;
   /** Ember drop-shadow glow around the mark (hero placements). */
@@ -24,7 +15,8 @@ type Props = {
 
 export default function HearthMark({ size = 20, glow = false, mono, style }: Props) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const fill = mono ?? `url(#${id})`;
+  const stroke = mono ?? `url(#${id})`;
+  const cursor = mono ?? "#ffb454";
   return (
     <svg
       width={size}
@@ -36,16 +28,17 @@ export default function HearthMark({ size = 20, glow = false, mono, style }: Pro
     >
       {!mono && (
         <defs>
-          <linearGradient id={id} x1="0" y1="44" x2="0" y2="2" gradientUnits="userSpaceOnUse">
+          <linearGradient id={id} x1="6" y1="40" x2="42" y2="8" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="#ff5f2e" />
-            <stop offset="0.45" stopColor="#ff7a45" />
+            <stop offset="0.55" stopColor="#ff7a45" />
             <stop offset="1" stopColor="#ffb454" />
           </linearGradient>
         </defs>
       )}
-      <path fill={fill} fillRule="evenodd" d={MARK_PATH} />
-      <rect x="38.6" y="7.6" width="4.4" height="4.4" rx="1.3" fill={mono ?? "#ffb454"} opacity="0.9" />
-      <rect x="43.2" y="2.2" width="2.9" height="2.9" rx="0.9" fill={mono ?? "#ffb454"} opacity="0.55" />
+      <rect x="8" y="10.5" width="32" height="27" rx="7.5" stroke={stroke} strokeWidth="3" />
+      <path d="M8.6 17.5 H39.4" stroke={stroke} strokeWidth="2" opacity="0.45" />
+      <path d="M16 23 L21.5 27 L16 31" stroke={stroke} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="24.5" y="29" width="8.5" height="2.8" rx="1.4" fill={cursor} />
     </svg>
   );
 }

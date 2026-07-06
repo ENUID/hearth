@@ -34,16 +34,14 @@ const dim = A("2");
 const emberBold = (s) => (isTTY ? `\x1b[1m\x1b[38;2;255;122;69m${s}\x1b[0m` : String(s));
 const CLR = "\x1b[0m";
 
-// The Burning Cursor, in blocks — the terminal glyph that catches fire.
+// The Hearth mark, in box-drawing — a terminal window with an ember prompt.
 function logo() {
-  const c = "\x1b[38;2;255;122;69m", w = "\x1b[38;2;255;180;84m", r = CLR;
   if (!isTTY) return ["  hearth"];
   return [
-    `  ${w}▟▖`,
-    ` ${c}▟██▖`,
-    ` ${c}████`,
-    ` ${c}█▁█${r} `,
-  ].map((l) => l + r);
+    ember("╭──────╮"),
+    ember("│ ") + emberBold("›") + amber("▁") + ember("   │"),
+    ember("╰──────╯"),
+  ];
 }
 
 // --- models API -------------------------------------------------------------

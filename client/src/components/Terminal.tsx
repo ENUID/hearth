@@ -9,7 +9,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import type { ITheme } from "@xterm/xterm";
 import type { PtySocket } from "../hooks/usePtySocket";
-import { MARK_PATH } from "./HearthMark";
+import HearthMark from "./HearthMark";
 import { useSettings, getSettings } from "../lib/settings";
 
 type Mods = { ctrl: boolean; alt: boolean };
@@ -304,12 +304,11 @@ export default function Terminal({ ptySocket, modifiersRef, onConsumeModifiers, 
 
       {/* ambient brand mark — sits in the corner, low-opacity, never in the
           way of scrollback (bottom-right, behind where output accumulates). */}
-      <svg
-        width="140" height="140" viewBox="0 0 48 48" fill="none" aria-hidden="true"
+      <HearthMark
+        size={140}
+        mono="var(--fg)"
         style={{ position: "absolute", right: 4, bottom: 4, opacity: 0.035, pointerEvents: "none" }}
-      >
-        <path fill="var(--fg)" fillRule="evenodd" d={MARK_PATH} />
-      </svg>
+      />
 
       {searchOpen && (
         <div
