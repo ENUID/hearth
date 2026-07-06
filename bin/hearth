@@ -1,43 +1,90 @@
 #!/usr/bin/env node
-/* hearth — chat with your running model right in the terminal.
+/* hearth — chat with your workspace's model, right in the terminal.
  *
- *   hearth                  start an interactive chat (Ctrl-D to exit)
- *   hearth ask "question"   one-shot, prints the answer and exits
+ *   hearth                  interactive chat with a branded start screen
+ *   hearth ask "question"   one-shot: print the answer and exit
  *   hearth "question"       same as ask
  *
+ * In interactive mode:
+ *   /model      pick + start a model (the ✦ catalog, in the terminal)
+ *   /clear      clear the conversation
+ *   /help       commands
+ *   Ctrl-D      exit
+ *
  * Talks to the OpenAI-compatible endpoint Hearth exposes ($HEARTH_MODEL_URL),
- * which serves whichever model the workspace is running (or your own provider,
- * if HEARTH_MODEL_URL/KEY point there). The terminal and the model, as one.
+ * plus the models API for the picker. Terminal and model, as one.
  */
 const readline = require("readline");
+const path = require("path");
 
-const BASE = (process.env.HEARTH_MODEL_URL || "http://localhost:3001/api/models/v1").replace(/\/$/, "");
+// --- endpoints --------------------------------------------------------------
+const V1 = (process.env.HEARTH_MODEL_URL || "http://localhost:3001/api/models/v1").replace(/\/$/, "");
+const MODELS_API = V1.replace(/\/v1$/, ""); // .../api/models
 const KEY = process.env.HEARTH_MODEL_KEY || process.env.HEARTH_TOKEN || "hearth";
+const WS = process.env.HEARTH_WORKSPACE || "workspace";
+const VERSION = (() => { try { return require(path.join(__dirname, "..", "package.json")).version; } catch { return "0.1.0"; } })();
 
+// --- ANSI palette (ember) ---------------------------------------------------
+const isTTY = process.stdout.isTTY;
+const A = (code) => (s) => (isTTY ? `\x1b[${code}m${s}\x1b[0m` : String(s));
+const ember = A("38;2;255;122;69");   // accent
+const amber = A("38;2;255;180;84");   // accent-2
+const bold = A("1");
+const dim = A("2");
+const emberBold = (s) => (isTTY ? `\x1b[1m\x1b[38;2;255;122;69m${s}\x1b[0m` : String(s));
+const CLR = "\x1b[0m";
+
+// The Burning Cursor, in blocks — the terminal glyph that catches fire.
+function logo() {
+  const c = "\x1b[38;2;255;122;69m", w = "\x1b[38;2;255;180;84m", r = CLR;
+  if (!isTTY) return ["  hearth"];
+  return [
+    `  ${w}▟▖`,
+    ` ${c}▟██▖`,
+    ` ${c}████`,
+    ` ${c}█▁█${r} `,
+  ].map((l) => l + r);
+}
+
+// --- models API -------------------------------------------------------------
+async function snapshot() {
+  try {
+    const r = await fetch(`${MODELS_API}?ws=${encodeURIComponent(WS)}`, { headers: { authorization: `Bearer ${KEY}` } });
+    if (!r.ok) return null;
+    return await r.json(); // { catalog, running, backend, apiPath }
+  } catch { return null; }
+}
+async function startModel(id) {
+  const r = await fetch(`${MODELS_API}/start`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${KEY}` },
+    body: JSON.stringify({ modelId: id, ws: WS }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+  return (await r.json()).running;
+}
+
+// --- chat streaming ---------------------------------------------------------
 async function stream(messages) {
   let res;
   try {
-    res = await fetch(`${BASE}/chat/completions`, {
+    res = await fetch(`${V1}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${KEY}` },
-      body: JSON.stringify({ messages, stream: true }),
+      body: JSON.stringify({ ws: WS, messages, stream: true }),
     });
   } catch (e) {
-    process.stdout.write(`\n[hearth] can't reach the model at ${BASE} (${e.message})\n`);
+    process.stdout.write(`\n${dim(`can't reach the model at ${V1} (${e.message})`)}\n`);
     return "";
   }
   if (!res.ok) {
-    if (res.status === 409) {
-      process.stdout.write("\n[hearth] no model is running. Open the ✦ models panel and start one (or set HEARTH_MODEL_URL to your own provider).\n");
-    } else {
-      process.stdout.write(`\n[hearth] error ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}\n`);
-    }
+    if (res.status === 409) process.stdout.write(`\n${amber("no model is running.")} ${dim("Type")} ${emberBold("/model")} ${dim("to start one.")}\n`);
+    else process.stdout.write(`\n${dim(`error ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`)}\n`);
     return "";
   }
   const reader = res.body.getReader();
   const dec = new TextDecoder();
-  let acc = "";
-  let buf = "";
+  let acc = "", buf = "";
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -50,17 +97,158 @@ async function stream(messages) {
       if (p === "[DONE]") continue;
       try {
         const d = JSON.parse(p).choices?.[0]?.delta?.content;
-        if (d) {
-          process.stdout.write(d);
-          acc += d;
-        }
-      } catch {
-        /* ignore keepalives */
-      }
+        if (d) { process.stdout.write(d); acc += d; }
+      } catch { /* keepalive */ }
     }
   }
   process.stdout.write("\n");
   return acc;
+}
+
+// --- interactive /model picker (raw mode) -----------------------------------
+// A fixed-height window over the (possibly long) catalog, redrawn in place.
+function pickModel(catalog, runningId) {
+  return new Promise((resolve) => {
+    const chat = catalog.filter((m) => m.category === "chat");
+    if (!chat.length) return resolve(null);
+    let sel = chat.findIndex((m) => m.id === runningId);
+    if (sel < 0) sel = 0;
+    const stdin = process.stdin;
+    const rawOK = isTTY && stdin.setRawMode;
+    const MAXV = Math.min(8, chat.length);   // rows visible at once
+    const HEIGHT = MAXV * 2 + 3;             // above-hint + MAXV*2 + below-hint + keys-hint
+    let top = 0;
+
+    const header = `\n${bold("Select Model")}\n${dim("Run any of these on your workspace — the terminal and the model, as one.")}\n\n`;
+
+    function draw(first) {
+      if (sel < top) top = sel;
+      if (sel >= top + MAXV) top = sel - MAXV + 1;
+      const parts = [top > 0 ? dim(`  ⋯ ${top} more above`) : ""];
+      for (let i = top; i < top + MAXV; i++) {
+        const m = chat[i], on = i === sel;
+        const cur = m.id === runningId ? ember(" (current)") : "";
+        const num = on ? emberBold(`${i + 1}.`) : dim(`${i + 1}.`);
+        const arrow = on ? ember("› ") : "  ";
+        const name = on ? emberBold(m.name) : bold(m.name);
+        parts.push(`${arrow}${num} ${name}${cur}  ${dim(`${m.params} · ${m.family}`)}`);
+        parts.push(`     ${dim(m.blurb)}`);
+      }
+      parts.push(top + MAXV < chat.length ? dim(`  ⋯ ${chat.length - top - MAXV} more below`) : "");
+      parts.push(dim("↑/↓ move · 1–9 jump · enter confirm · esc cancel"));
+      process.stdout.write((first ? header : `\x1b[${HEIGHT}A\x1b[0J`) + parts.join("\n") + "\n");
+    }
+    draw(true);
+
+    // Take sole control of stdin for the duration of the pick: detach any
+    // existing keypress listeners (e.g. the paused readline), then restore them
+    // on finish. Without resuming the stream no keypress events would flow.
+    const prevKeypress = stdin.listeners("keypress").slice();
+    stdin.removeAllListeners("keypress");
+    if (rawOK) stdin.setRawMode(true);
+    readline.emitKeypressEvents(stdin);
+    stdin.resume();
+    const onKey = (_str, k) => {
+      if (!k) return;
+      if (k.name === "up" || k.name === "k") { sel = (sel - 1 + chat.length) % chat.length; draw(false); }
+      else if (k.name === "down" || k.name === "j") { sel = (sel + 1) % chat.length; draw(false); }
+      else if (/^[1-9]$/.test(k.name || "")) { const n = parseInt(k.name, 10) - 1; if (n < chat.length) { sel = n; draw(false); } }
+      else if (k.name === "return") finish(chat[sel]);
+      else if (k.name === "escape" || (k.ctrl && k.name === "c") || k.name === "q") finish(null);
+    };
+    function finish(choice) {
+      stdin.removeListener("keypress", onKey);
+      if (rawOK) stdin.setRawMode(false);
+      // Hand stdin back to whoever held it before (the paused readline).
+      prevKeypress.forEach((l) => stdin.on("keypress", l));
+      process.stdout.write(`\x1b[${HEIGHT}A\x1b[0J`); // wipe the picker
+      resolve(choice);
+    }
+    stdin.on("keypress", onKey);
+  });
+}
+
+// --- start screen -----------------------------------------------------------
+function homePath() {
+  const cwd = process.cwd(), home = process.env.HOME || "";
+  return home && cwd.startsWith(home) ? "~" + cwd.slice(home.length) : cwd;
+}
+function banner(snap) {
+  const running = snap && snap.running && snap.running.status !== "stopped" ? snap.running : null;
+  const backend = snap ? snap.backend : "";
+  const modelLine = running ? `${bold(running.name)} ${dim("·")} ${ember("running")}` : `${dim("no model")} ${dim("·")} ${amber("idle")}`;
+  const be = backend === "stub" ? dim(" · demo") : backend ? dim(` · ${backend}`) : "";
+  const lg = logo();
+  const info = [
+    `${emberBold("hearth")}  ${dim("v" + VERSION)}`,
+    `${modelLine}${be}   ${dim("/model")}`,
+    `${dim(homePath())}`,
+    ``,
+  ];
+  let out = "\n";
+  for (let i = 0; i < Math.max(lg.length, info.length); i++) {
+    out += "  " + (lg[i] || "    ") + "   " + (info[i] || "") + "\n";
+  }
+  out += `${dim("Tip:")} ${amber("New")} ${dim("— type")} ${emberBold("/model")} ${dim("to switch models,")} ${emberBold("/help")} ${dim("for commands.")}\n\n`;
+  return out;
+}
+
+// --- REPL -------------------------------------------------------------------
+async function repl() {
+  let snap = await snapshot();
+  process.stdout.write(banner(snap));
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: ember("› ") });
+  const history = [];
+  rl.prompt();
+
+  rl.on("line", async (line) => {
+    const text = line.trim();
+    if (!text) return rl.prompt();
+
+    if (text[0] === "/") {
+      const [cmd] = text.slice(1).split(/\s+/);
+      if (cmd === "help") {
+        process.stdout.write(
+          `\n  ${emberBold("/model")}   ${dim("pick + start a model")}\n` +
+          `  ${emberBold("/clear")}   ${dim("clear the conversation")}\n` +
+          `  ${emberBold("/help")}    ${dim("this list")}\n` +
+          `  ${emberBold("Ctrl-D")}   ${dim("exit")}\n\n`
+        );
+        return rl.prompt();
+      }
+      if (cmd === "clear") { history.length = 0; process.stdout.write("\x1b[2J\x1b[H" + banner(snap)); return rl.prompt(); }
+      if (cmd === "model") {
+        snap = (await snapshot()) || snap;
+        if (!snap || !snap.catalog) { process.stdout.write(`\n${dim("model catalog unavailable (is this a Hearth workspace?)")}\n\n`); return rl.prompt(); }
+        rl.pause();
+        const runningId = snap.running && snap.running.status !== "stopped" ? snap.running.modelId : null;
+        const choice = await pickModel(snap.catalog, runningId);
+        if (choice) {
+          if (choice.id === runningId) process.stdout.write(`${dim("keeping")} ${bold(choice.name)}\n\n`);
+          else {
+            process.stdout.write(`${dim("starting")} ${bold(choice.name)}${dim("…")}`);
+            try { const r = await startModel(choice.id); process.stdout.write(`\r${ember("✓")} ${bold(r.name)} ${dim("running")}          \n\n`); snap = (await snapshot()) || snap; }
+            catch (e) { process.stdout.write(`\r${amber("×")} ${dim(String(e.message))}          \n\n`); }
+          }
+        } else process.stdout.write("\n");
+        rl.resume();
+        return rl.prompt();
+      }
+      process.stdout.write(`\n${dim(`unknown command: /${cmd} — try /help`)}\n\n`);
+      return rl.prompt();
+    }
+
+    history.push({ role: "user", content: text });
+    process.stdout.write(emberBold("✦") + "\n");
+    rl.pause();
+    const reply = await stream(history);
+    history.push({ role: "assistant", content: reply });
+    rl.resume();
+    rl.prompt();
+  });
+
+  rl.on("close", () => { process.stdout.write(`\n${dim("bye.")}\n`); process.exit(0); });
 }
 
 async function main() {
@@ -70,25 +258,7 @@ async function main() {
     if (q.trim()) await stream([{ role: "user", content: q }]);
     return;
   }
-
-  process.stdout.write("hearth — chat with your model. Ctrl-D to exit.\n");
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "› " });
-  const history = [];
-  rl.prompt();
-  rl.on("line", async (line) => {
-    const text = line.trim();
-    if (!text) return rl.prompt();
-    history.push({ role: "user", content: text });
-    rl.pause();
-    const reply = await stream(history);
-    history.push({ role: "assistant", content: reply });
-    rl.resume();
-    rl.prompt();
-  });
-  rl.on("close", () => {
-    process.stdout.write("\nbye.\n");
-    process.exit(0);
-  });
+  await repl();
 }
 
 main();
