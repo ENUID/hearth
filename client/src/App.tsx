@@ -159,14 +159,12 @@ export default function App() {
     return terms.current.get(activeSidRef.current)?.readTail(lines) ?? "";
   }, []);
 
-  // tab ops (within the active workspace)
+  // tab ops (within the active workspace). Tab labels are rendered from live
+  // position (1..N), so title here is just a stable id-free placeholder.
   const newTab = useCallback(() => {
     setCur((s) => {
       const id = "t" + Date.now().toString(36);
-      // Number from the highest existing tab, so closing a tab never makes a new
-      // one reuse a number (which produced duplicate "2 2 2" titles).
-      const nextNum = s.tabs.reduce((m, t) => Math.max(m, parseInt(t.title, 10) || 0), 0) + 1;
-      return { tabs: [...s.tabs, { id, title: String(nextNum) }], active: id };
+      return { tabs: [...s.tabs, { id, title: "" }], active: id };
     });
   }, [setCur]);
   const selectTab = useCallback((id: string) => setCur((s) => ({ ...s, active: id })), [setCur]);
@@ -407,11 +405,13 @@ export default function App() {
 
         {/* tabs for the active workspace */}
         <div style={{ display: "flex", alignItems: "center", gap: 2, overflowX: "auto", flex: 1 }}>
-          {cur.tabs.map((t) => {
+          {cur.tabs.map((t, i) => {
             const isActive = t.id === cur.active;
             return (
               <button key={t.id} onClick={() => selectTab(t.id)} className="hearth-act" style={{ ...tabChip, position: "relative", color: isActive ? "var(--fg)" : "var(--fg-subtle)", background: isActive ? "var(--accent-soft)" : "transparent" }}>
-                {t.title}
+                {/* label is the tab's live position, so removing any tab (even a
+                    middle one) renumbers the rest 1..N automatically */}
+                {i + 1}
                 <span onClick={(e) => { e.stopPropagation(); closeTab(t.id); }} title="close tab" style={{ opacity: 0.5, fontSize: 13, lineHeight: 1 }}>×</span>
                 {isActive && <span style={tabGlow} />}
               </button>
