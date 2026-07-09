@@ -7,6 +7,7 @@
  *
  * In interactive mode:
  *   /model      pick + start a model (the ✦ catalog, in the terminal)
+ *   /agents     install + run a CLI agent (the ◆ catalog, in the terminal)
  *   /clear      clear the conversation
  *   /help       commands
  *   Ctrl-D      exit
@@ -20,6 +21,7 @@ const path = require("path");
 // --- endpoints --------------------------------------------------------------
 const V1 = (process.env.HEARTH_MODEL_URL || "http://localhost:3001/api/models/v1").replace(/\/$/, "");
 const MODELS_API = V1.replace(/\/v1$/, ""); // .../api/models
+const AGENTS_API = MODELS_API.replace(/\/models$/, "/agents"); // .../api/agents
 const KEY = process.env.HEARTH_MODEL_KEY || process.env.HEARTH_TOKEN || "hearth";
 const WS = process.env.HEARTH_WORKSPACE || "workspace";
 const VERSION = (() => { try { return require(path.join(__dirname, "..", "package.json")).version; } catch { return "0.1.0"; } })();
@@ -103,36 +105,61 @@ async function stream(messages) {
   return acc;
 }
 
-// --- interactive /model picker (raw mode) -----------------------------------
-// A fixed-height window over the (possibly long) catalog, redrawn in place.
-function pickModel(catalog, runningId) {
+// --- agents API -------------------------------------------------------------
+async function agentsSnapshot() {
+  try {
+    const r = await fetch(AGENTS_API, { headers: { authorization: `Bearer ${KEY}` } });
+    if (!r.ok) return null;
+    const { catalog } = await r.json();
+    const installed = await fetch(`${AGENTS_API}/status`, { headers: { authorization: `Bearer ${KEY}` } })
+      .then((x) => (x.ok ? x.json() : { installed: {} }))
+      .then((s) => s.installed || {})
+      .catch(() => ({}));
+    return { catalog, installed };
+  } catch { return null; }
+}
+
+// Run a shell command in this terminal (install or launch an agent). Inherits
+// the real TTY, so interactive agents take over the screen; resolves on exit.
+// `freeModel` points OpenAI-compatible agents at the workspace's own model.
+function runShell(cmd, freeModel) {
   return new Promise((resolve) => {
-    const chat = catalog.filter((m) => m.category === "chat");
-    if (!chat.length) return resolve(null);
-    let sel = chat.findIndex((m) => m.id === runningId);
-    if (sel < 0) sel = 0;
+    const { spawn } = require("child_process");
+    const env = { ...process.env };
+    if (freeModel) { env.OPENAI_BASE_URL = V1; env.OPENAI_API_BASE = V1; env.OPENAI_API_KEY = KEY; }
+    const child = spawn(cmd, { shell: true, stdio: "inherit", env });
+    child.on("error", (e) => { process.stdout.write(`\n${dim("couldn't run: " + e.message)}\n`); resolve(); });
+    child.on("exit", () => resolve());
+  });
+}
+
+// --- interactive picker (raw mode) ------------------------------------------
+// A fixed-height window over a (possibly long) list, redrawn in place.
+// rows: [{ title, meta, blurb, tag }]. Resolves the chosen index, or -1.
+function pickFrom(header, rows, startIdx) {
+  return new Promise((resolve) => {
+    if (!rows.length) return resolve(-1);
+    let sel = startIdx >= 0 && startIdx < rows.length ? startIdx : 0;
     const stdin = process.stdin;
     const rawOK = isTTY && stdin.setRawMode;
-    const MAXV = Math.min(8, chat.length);   // rows visible at once
+    const MAXV = Math.min(8, rows.length);   // rows visible at once
     const HEIGHT = MAXV * 2 + 3;             // above-hint + MAXV*2 + below-hint + keys-hint
     let top = 0;
-
-    const header = `\n${bold("Select Model")}\n${dim("Run any of these on your workspace — the terminal and the model, as one.")}\n\n`;
 
     function draw(first) {
       if (sel < top) top = sel;
       if (sel >= top + MAXV) top = sel - MAXV + 1;
       const parts = [top > 0 ? dim(`  ⋯ ${top} more above`) : ""];
       for (let i = top; i < top + MAXV; i++) {
-        const m = chat[i], on = i === sel;
-        const cur = m.id === runningId ? ember(" (current)") : "";
+        const r = rows[i], on = i === sel;
+        const tag = r.tag ? ember(` ${r.tag}`) : "";
         const num = on ? emberBold(`${i + 1}.`) : dim(`${i + 1}.`);
         const arrow = on ? ember("› ") : "  ";
-        const name = on ? emberBold(m.name) : bold(m.name);
-        parts.push(`${arrow}${num} ${name}${cur}  ${dim(`${m.params} · ${m.family}`)}`);
-        parts.push(`     ${dim(m.blurb)}`);
+        const name = on ? emberBold(r.title) : bold(r.title);
+        parts.push(`${arrow}${num} ${name}${tag}  ${dim(r.meta)}`);
+        parts.push(`     ${dim(r.blurb)}`);
       }
-      parts.push(top + MAXV < chat.length ? dim(`  ⋯ ${chat.length - top - MAXV} more below`) : "");
+      parts.push(top + MAXV < rows.length ? dim(`  ⋯ ${rows.length - top - MAXV} more below`) : "");
       parts.push(dim("↑/↓ move · 1–9 jump · enter confirm · esc cancel"));
       process.stdout.write((first ? header : `\x1b[${HEIGHT}A\x1b[0J`) + parts.join("\n") + "\n");
     }
@@ -148,22 +175,46 @@ function pickModel(catalog, runningId) {
     stdin.resume();
     const onKey = (_str, k) => {
       if (!k) return;
-      if (k.name === "up" || k.name === "k") { sel = (sel - 1 + chat.length) % chat.length; draw(false); }
-      else if (k.name === "down" || k.name === "j") { sel = (sel + 1) % chat.length; draw(false); }
-      else if (/^[1-9]$/.test(k.name || "")) { const n = parseInt(k.name, 10) - 1; if (n < chat.length) { sel = n; draw(false); } }
-      else if (k.name === "return") finish(chat[sel]);
-      else if (k.name === "escape" || (k.ctrl && k.name === "c") || k.name === "q") finish(null);
+      if (k.name === "up" || k.name === "k") { sel = (sel - 1 + rows.length) % rows.length; draw(false); }
+      else if (k.name === "down" || k.name === "j") { sel = (sel + 1) % rows.length; draw(false); }
+      else if (/^[1-9]$/.test(k.name || "")) { const n = parseInt(k.name, 10) - 1; if (n < rows.length) { sel = n; draw(false); } }
+      else if (k.name === "return") finish(sel);
+      else if (k.name === "escape" || (k.ctrl && k.name === "c") || k.name === "q") finish(-1);
     };
-    function finish(choice) {
+    function finish(idx) {
       stdin.removeListener("keypress", onKey);
       if (rawOK) stdin.setRawMode(false);
       // Hand stdin back to whoever held it before (the paused readline).
       prevKeypress.forEach((l) => stdin.on("keypress", l));
       process.stdout.write(`\x1b[${HEIGHT}A\x1b[0J`); // wipe the picker
-      resolve(choice);
+      resolve(idx);
     }
     stdin.on("keypress", onKey);
   });
+}
+
+// Pick a chat model to run (the ✦ catalog, in the terminal).
+async function pickModel(catalog, runningId) {
+  const chat = catalog.filter((m) => m.category === "chat");
+  if (!chat.length) return null;
+  const header = `\n${bold("Select Model")}\n${dim("Run any of these on your workspace — the terminal and the model, as one.")}\n\n`;
+  const rows = chat.map((m) => ({ title: m.name, meta: `${m.params} · ${m.family}`, blurb: m.blurb, tag: m.id === runningId ? "(current)" : "" }));
+  const idx = await pickFrom(header, rows, chat.findIndex((m) => m.id === runningId));
+  return idx < 0 ? null : chat[idx];
+}
+
+// Pick a CLI agent to install / run (the ◆ catalog, in the terminal).
+async function pickAgent(catalog, installed) {
+  if (!catalog.length) return null;
+  const header = `\n${bold("Agents")}\n${dim("CLI coding agents — install into your terminal, run against your free model or your own key.")}\n\n`;
+  const rows = catalog.map((a) => ({
+    title: a.name,
+    meta: `${a.vendor}${a.openSource ? " · open source" : ""}`,
+    blurb: a.blurb,
+    tag: installed[a.id] ? "installed ✓" : "",
+  }));
+  const idx = await pickFrom(header, rows, 0);
+  return idx < 0 ? null : catalog[idx];
 }
 
 // --- start screen -----------------------------------------------------------
@@ -187,7 +238,7 @@ function banner(snap) {
   for (let i = 0; i < Math.max(lg.length, info.length); i++) {
     out += "  " + (lg[i] || "    ") + "   " + (info[i] || "") + "\n";
   }
-  out += `${dim("Tip:")} ${amber("New")} ${dim("— type")} ${emberBold("/model")} ${dim("to switch models,")} ${emberBold("/help")} ${dim("for commands.")}\n\n`;
+  out += `${dim("Tip:")} ${dim("type")} ${emberBold("/model")} ${dim("for models,")} ${emberBold("/agents")} ${dim("for agents,")} ${emberBold("/help")} ${dim("for commands.")}\n\n`;
   return out;
 }
 
@@ -208,10 +259,11 @@ async function repl() {
       const [cmd] = text.slice(1).split(/\s+/);
       if (cmd === "help") {
         process.stdout.write(
-          `\n  ${emberBold("/model")}   ${dim("pick + start a model")}\n` +
-          `  ${emberBold("/clear")}   ${dim("clear the conversation")}\n` +
-          `  ${emberBold("/help")}    ${dim("this list")}\n` +
-          `  ${emberBold("Ctrl-D")}   ${dim("exit")}\n\n`
+          `\n  ${emberBold("/model")}    ${dim("pick + start a model")}\n` +
+          `  ${emberBold("/agents")}   ${dim("install + run a CLI agent (Claude Code, Aider…)")}\n` +
+          `  ${emberBold("/clear")}    ${dim("clear the conversation")}\n` +
+          `  ${emberBold("/help")}     ${dim("this list")}\n` +
+          `  ${emberBold("Ctrl-D")}    ${dim("exit")}\n\n`
         );
         return rl.prompt();
       }
@@ -228,6 +280,26 @@ async function repl() {
             process.stdout.write(`${dim("starting")} ${bold(choice.name)}${dim("…")}`);
             try { const r = await startModel(choice.id); process.stdout.write(`\r${ember("✓")} ${bold(r.name)} ${dim("running")}          \n\n`); snap = (await snapshot()) || snap; }
             catch (e) { process.stdout.write(`\r${amber("×")} ${dim(String(e.message))}          \n\n`); }
+          }
+        } else process.stdout.write("\n");
+        rl.resume();
+        return rl.prompt();
+      }
+      if (cmd === "agents") {
+        const a = await agentsSnapshot();
+        if (!a || !a.catalog) { process.stdout.write(`\n${dim("agent catalog unavailable (is this a Hearth workspace?)")}\n\n`); return rl.prompt(); }
+        rl.pause();
+        const choice = await pickAgent(a.catalog, a.installed);
+        if (choice) {
+          const free = choice.brain !== "byok";
+          if (!a.installed[choice.id]) {
+            process.stdout.write(`${dim("installing")} ${bold(choice.name)}${dim(" …")}\n${dim("$ " + choice.install)}\n`);
+            await runShell(choice.install, false);
+            process.stdout.write(`${ember("✓")} ${dim("installed — run it with")} ${emberBold("/agents")} ${dim("again, or")} ${emberBold(choice.run)}\n\n`);
+          } else {
+            process.stdout.write(`${ember("▶")} ${bold(choice.name)}${free ? dim(" · your free model") : ""}\n\n`);
+            await runShell(choice.run, free);
+            process.stdout.write("\n");
           }
         } else process.stdout.write("\n");
         rl.resume();
