@@ -480,7 +480,7 @@ export default function App() {
         {modelsOpen && <ModelsPanel ws={activeWs} onClose={() => setModelsOpen(false)} />}
         {agentsOpen && (
           <AgentsPanel
-            onRun={(cmd) => { sendToActive(cmd); setAgentsOpen(false); }}
+            onRun={(cmd) => sendToActive(cmd)}
             onClose={() => setAgentsOpen(false)}
           />
         )}

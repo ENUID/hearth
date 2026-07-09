@@ -290,9 +290,11 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
               <div style={{ marginTop: 8 }}>
                 <div style={{ background: "var(--accent-soft)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "8px 10px", marginBottom: 8 }}>
                   <span style={{ fontSize: 12, color: "var(--fg)" }}>
-                    Chat in your terminal — type <code style={{ fontFamily: "var(--font-mono)", color: "var(--accent)", fontWeight: 600 }}>hearth</code>
+                    Ask it in the <b>prompt bar below</b> — type a question and press ↵ <span style={{ color: "var(--fg-subtle)" }}>(⇥ toggles run / ask)</span>.
                   </span>
-                  <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 2 }}>the model and the terminal, as one</div>
+                  <div style={{ fontSize: 10, color: "var(--fg-subtle)", marginTop: 3 }}>
+                    Or from any bare terminal (SSH, tmux): run <code style={{ fontFamily: "var(--font-mono)", color: "var(--accent)", fontWeight: 600 }}>hearth</code>.
+                  </div>
                 </div>
                 <div style={{ fontSize: 10, color: "var(--fg-subtle)", textTransform: "uppercase", letterSpacing: "0.05em" }}>API endpoint</div>
                 <div onClick={() => navigator.clipboard?.writeText(endpoint).then(() => setMsg("copied")).catch(() => {})} title="copy"
@@ -334,10 +336,13 @@ export default function ModelsPanel({ ws, onClose }: { ws: string; onClose: () =
           ) : isChat ? (
             // Cloud/network chat model: no in-panel box — the header above already
             // has the details (endpoint, hint). This is just the terminal-first callout.
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24, textAlign: "center" }}>
-              <div style={{ fontSize: 26, color: "var(--fg-subtle)", fontFamily: "var(--font-mono)" }}>›_</div>
-              <div style={{ fontSize: 12, color: "var(--fg-muted)" }}>Open a terminal tab and run</div>
-              <code style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--accent)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "5px 12px" }}>hearth</code>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, textAlign: "center" }}>
+              <div style={{ fontSize: 24, color: "var(--accent)" }}>✦</div>
+              <div style={{ fontSize: 13, color: "var(--fg)" }}>Ask it in the prompt bar below</div>
+              <div style={{ fontSize: 12, color: "var(--fg-muted)" }}>Type your question and press ↵ — no need to leave this screen.</div>
+              <div style={{ fontSize: 11, color: "var(--fg-subtle)", marginTop: 4 }}>
+                Bare terminal instead? Run <code style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}>hearth</code>.
+              </div>
             </div>
           ) : runningCat === "image" ? (
             <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>

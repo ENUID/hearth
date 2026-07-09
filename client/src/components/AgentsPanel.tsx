@@ -30,12 +30,20 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
     return () => clearInterval(t);
   }, [refreshStatus]);
 
-  function run(cmd: string) {
+  // Send a command into the active terminal (runs it — trailing newline).
+  function send(cmd: string) {
     onRun(cmd + "\n");
   }
+  // Launching an agent hands it the whole terminal, so close the panel too.
+  function launch(cmd: string) {
+    send(cmd);
+    onClose();
+  }
   function install(a: AgentInfo) {
-    run(a.install);
-    setMsg(`installing ${a.name} in your terminal…`);
+    send(a.install);
+    // Stay open: the card flips to "installed ✓" with a Run button once the
+    // install finishes (probed every 5s), so the next step is always in view.
+    setMsg(`Installing ${a.name} in your terminal — the Run button here lights up when it's ready.`);
   }
 
   return (
@@ -74,17 +82,17 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                   {isIn ? (
                     canFree ? (
-                      <button onClick={() => run(FREE_PREFIX + a.run)} className="hearth-act hearth-act-primary" style={runBtn} title="run pointed at your free Hearth model">
+                      <button onClick={() => launch(FREE_PREFIX + a.run)} className="hearth-act hearth-act-primary" style={runBtn} title="run pointed at your free Hearth model">
                         Run · free model
                       </button>
                     ) : (
-                      <button onClick={() => run(a.run)} className="hearth-act hearth-act-primary" style={runBtn}>Run</button>
+                      <button onClick={() => launch(a.run)} className="hearth-act hearth-act-primary" style={runBtn}>Run</button>
                     )
                   ) : (
                     <>
                       <button onClick={() => install(a)} className="hearth-act hearth-act-primary" style={runBtn}>Install</button>
                       {canFree && (
-                        <button onClick={() => run(FREE_PREFIX + a.run)} className="hearth-act" style={secondaryBtn} title="run pointed at your free Hearth model">
+                        <button onClick={() => launch(FREE_PREFIX + a.run)} className="hearth-act" style={secondaryBtn} title="run pointed at your free Hearth model">
                           Run · free model
                         </button>
                       )}
