@@ -163,7 +163,10 @@ export default function App() {
   const newTab = useCallback(() => {
     setCur((s) => {
       const id = "t" + Date.now().toString(36);
-      return { tabs: [...s.tabs, { id, title: String(s.tabs.length + 1) }], active: id };
+      // Number from the highest existing tab, so closing a tab never makes a new
+      // one reuse a number (which produced duplicate "2 2 2" titles).
+      const nextNum = s.tabs.reduce((m, t) => Math.max(m, parseInt(t.title, 10) || 0), 0) + 1;
+      return { tabs: [...s.tabs, { id, title: String(nextNum) }], active: id };
     });
   }, [setCur]);
   const selectTab = useCallback((id: string) => setCur((s) => ({ ...s, active: id })), [setCur]);
@@ -231,7 +234,11 @@ export default function App() {
     const onVV = () => {
       if (!rootRef.current) return;
       const keyboardOpen = window.innerHeight - vv.height > 80;
-      rootRef.current.style.height = keyboardOpen ? `${vv.height}px` : "";
+      // Pin to the keyboard-shrunk viewport only while the keyboard is open;
+      // otherwise restore the full dynamic-viewport height. (Setting "" here
+      // wiped React's inline height:100dvh, collapsing the app to content
+      // height — a gap at the bottom and the composer pushed off the first tab.)
+      rootRef.current.style.height = keyboardOpen ? `${vv.height}px` : "100dvh";
     };
     vv.addEventListener("resize", onVV);
     vv.addEventListener("scroll", onVV);
@@ -239,7 +246,7 @@ export default function App() {
     return () => {
       vv.removeEventListener("resize", onVV);
       vv.removeEventListener("scroll", onVV);
-      if (rootRef.current) rootRef.current.style.height = "";
+      if (rootRef.current) rootRef.current.style.height = "100dvh";
     };
   }, []);
 
