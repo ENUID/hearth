@@ -293,9 +293,10 @@ async function repl() {
         if (choice) {
           const free = choice.brain !== "byok";
           if (!a.installed[choice.id]) {
-            process.stdout.write(`${dim("installing")} ${bold(choice.name)}${dim(" …")}\n${dim("$ " + choice.install)}\n`);
-            await runShell(choice.install, false);
-            process.stdout.write(`${ember("✓")} ${dim("installed — run it with")} ${emberBold("/agents")} ${dim("again, or")} ${emberBold(choice.run)}\n\n`);
+            // One step: install, then launch it (open-source → your free model).
+            process.stdout.write(`${dim("installing + launching")} ${bold(choice.name)}${free ? dim(" · your free model") : ""}${dim(" …")}\n${dim("$ " + choice.install)}\n`);
+            await runShell(`${choice.install} && ${choice.run}`, free);
+            process.stdout.write("\n");
           } else {
             process.stdout.write(`${ember("▶")} ${bold(choice.name)}${free ? dim(" · your free model") : ""}\n\n`);
             await runShell(choice.run, free);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
-import { modelChat } from "../lib/api";
+import { modelChat, startModel } from "../lib/api";
 import { getSettings } from "../lib/settings";
 
 // The unified prompt — terminal and AI as ONE interface. There is a single
@@ -35,6 +35,11 @@ type Msg = { role: "user" | "assistant"; content: string };
 type Mode = "run" | "ask";
 
 const WORK_PHASES = ["Thinking", "Reading your terminal", "Reasoning", "Composing"];
+
+// Zero-config default: a small, free, CPU-only model, so a first "ask" with
+// nothing running just works in one step instead of erroring out.
+const AUTO_MODEL = "llama3.2:1b";
+const AUTO_MODEL_NAME = "Llama 3.2 1B";
 
 // Commands people actually type — first token in this set means "run".
 const CMDS = new Set([
@@ -84,11 +89,13 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
   const [manualMode, setManualMode] = useState<Mode | null>(null);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const [suggested, setSuggested] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   // Per-workspace conversation memory (display lives in the terminal itself).
   const historyRef = useRef<Record<string, Msg[]>>({});
   const sentRef = useRef<string[]>([]);
@@ -130,9 +137,11 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
   }
 
   useEffect(() => {
-    if (!busy) { setPhase(0); return; }
+    if (!busy) { setPhase(0); setElapsed(0); return; }
+    const start = Date.now();
     const t = setInterval(() => setPhase((p) => (p + 1) % WORK_PHASES.length), 1400);
-    return () => clearInterval(t);
+    const e = setInterval(() => setElapsed((Date.now() - start) / 1000), 100);
+    return () => { clearInterval(t); clearInterval(e); };
   }, [busy]);
 
   // ⌘J / Ctrl+J focuses the prompt from anywhere (Esc returns to the terminal).
@@ -168,7 +177,7 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
 
   async function ask(question: string) {
     const { acc, dim, rst, bold } = colors();
-    const model = runningModel ?? "hearth";
+    const model = runningModel ?? AUTO_MODEL_NAME;
     // Echo the question and open the AI's turn — inside the terminal itself.
     aiWrite(`\r\n${acc}${bold}you ❯${rst} ${dim}${question}${rst}\r\n${acc}${bold}✦ ${model} ❯${rst}\r\n`);
     const history = historyRef.current[ws] ?? [];
@@ -186,10 +195,17 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
     setBusy(true);
     setSuggested(null);
     try {
-      const res = await modelChat(messages, ws);
+      // One-step ask: if nothing is running, spin up the free CPU default first.
+      if (!runningModel) {
+        aiWrite(`${dim}· starting ${AUTO_MODEL_NAME}…${rst}\r\n`);
+        await startModel(AUTO_MODEL, ws).catch(() => {});
+      }
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      const res = await modelChat(messages, ws, ctrl.signal);
       if (!res.ok || !res.body) {
         const err = (await res.json().catch(() => ({}))).error;
-        throw new Error(res.status === 409 ? "no model is running — open ✦ models and start one" : err ?? `error ${res.status}`);
+        throw new Error(res.status === 409 ? "couldn't start a model — open ✦ models and pick one" : err ?? `error ${res.status}`);
       }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -223,10 +239,17 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
       const cmd = extractCommand(reply);
       if (cmd) setSuggested(cmd);
     } catch (e) {
-      aiWrite(`${dim}⚠ ${(e as Error).message}${rst}\r\n`);
+      if ((e as Error).name === "AbortError") aiWrite(`${dim}⏹ stopped${rst}\r\n`);
+      else aiWrite(`${dim}⚠ ${(e as Error).message}${rst}\r\n`);
     } finally {
+      abortRef.current = null;
       setBusy(false);
     }
+  }
+
+  // Stop the in-flight AI turn (aborts the streaming request).
+  function stop() {
+    abortRef.current?.abort();
   }
 
   function submit() {
@@ -273,25 +296,7 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
 
       {/* the prompt — docked in the same window, driving the same scrollback */}
       <div style={dock}>
-        <div
-          className="hearth-cmdbar"
-          style={{ ...promptBox, ...(dragOver ? promptBoxDragOver : {}) }}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            hidden
-            onChange={(e) => { if (e.target.files?.length) void attach(e.target.files); e.target.value = ""; }}
-          />
-          {dragOver && (
-            <div style={dropOverlay}>
-              <span style={{ color: "var(--accent)", fontSize: 13, fontWeight: 600 }}>drop to attach</span>
-            </div>
-          )}
+        <div style={dockInner}>
           {suggested && (
             <button className="hearth-rise hearth-act" onClick={() => { runCmd(suggested + "\r"); setSuggested(null); }} style={suggestChip} title="run the AI's suggested command">
               <span style={{ color: "var(--accent)" }}>▶</span>
@@ -299,69 +304,84 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
               <span onClick={(e) => { e.stopPropagation(); setSuggested(null); }} style={{ color: "var(--fg-subtle)", marginLeft: 4 }}>✕</span>
             </button>
           )}
-          <textarea
-            ref={taRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            placeholder={runningModel ? `Ask ${runningModel} anything, or type a command — Hearth knows which` : "Type a command · start a model in ✦ models to ask AI"}
-            rows={1}
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            style={{ ...textarea, fontFamily: isRun ? "var(--font-mono)" : "var(--font-sans)" }}
-            aria-label="hearth prompt"
-          />
-          <div style={row}>
-            {/* attach — pictures, files, anything, right from the prompt */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={attaching}
-              title="attach a file or image"
-              className="hearth-act"
-              style={{ ...attachBtn, opacity: attaching ? 0.5 : 1 }}
-            >
-              {attaching ? <span className="hearth-spin" style={{ width: 12, height: 12 }} /> : <ClipIcon />}
-            </button>
-            {/* live mode pill — flips as you type; Tab toggles */}
-            <span key={mode} className="hearth-rise" style={{ ...modePill, borderColor: isRun ? "var(--border-strong)" : "var(--accent)", color: isRun ? "var(--fg)" : "var(--accent)" }} title="Tab to switch">
-              {isRun ? "›_ run" : "✦ ask"}
+
+          <div
+            className="hearth-cmdbar"
+            style={{ ...promptBox, ...(dragOver ? promptBoxDragOver : {}) }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+          >
+            <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { if (e.target.files?.length) void attach(e.target.files); e.target.value = ""; }} />
+            {dragOver && (
+              <div style={dropOverlay}><span style={{ color: "var(--accent)", fontSize: 13, fontWeight: 600 }}>drop to attach</span></div>
+            )}
+            <div style={inputRow}>
+              {/* caret reflects the live mode: › run, ✦ ask */}
+              <span style={caret} aria-hidden>{isRun ? "›" : "✦"}</span>
+              <textarea
+                ref={taRef}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={onKeyDown}
+                onPaste={onPaste}
+                placeholder={runningModel ? `Message ${runningModel}, or type a command` : "Ask anything, or type a command"}
+                rows={1}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ ...textarea, fontFamily: isRun ? "var(--font-mono)" : "var(--font-sans)" }}
+                aria-label="hearth prompt"
+              />
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={attaching} title="attach a file or image" className="hearth-act" style={{ ...attachBtn, opacity: attaching ? 0.5 : 1 }}>
+                {attaching ? <span className="hearth-spin" style={{ width: 12, height: 12 }} /> : <ClipIcon />}
+              </button>
+              {busy ? (
+                <button type="button" onClick={stop} className="hearth-act" style={stopBtn} aria-label="stop" title="stop (Esc)">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+                </button>
+              ) : (
+                <button type="button" onClick={submit} disabled={!value.trim()} className="hearth-act hearth-act-primary" style={{ ...sendBtn, opacity: !value.trim() ? 0.4 : 1 }} aria-label={isRun ? "run" : "send"}>
+                  {isRun ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* status line — working / shortcuts (left) · model · mode (right) */}
+          <div style={metaRow}>
+            <span style={metaLeft}>
+              {busy ? (
+                <>
+                  <span className="hearth-shimmer" style={{ fontWeight: 600, color: "var(--fg-muted)" }}>{WORK_PHASES[phase]}…</span>
+                  <span style={{ color: "var(--fg-subtle)", marginLeft: 6 }}>{elapsed.toFixed(1)}s</span>
+                  <span style={sep}>·</span>
+                  <button type="button" onClick={stop} style={stopLink}>[stop]</button>
+                </>
+              ) : (
+                <>
+                  <span style={kbd}>⏎</span> {isRun ? "run" : "send"}<span style={sep}>·</span><span style={kbd}>⇥</span> mode
+                  <span className="hearth-desktop-only"><span style={sep}>·</span><span style={kbd}>⌘J</span> focus</span>
+                </>
+              )}
             </span>
             <button
               type="button"
               onClick={onOpenModels}
-              title={runningModel && modelBackend === "stub" ? "demo backend — replies are placeholders until a real model server (ollama / http) is configured" : "models"}
+              title={runningModel && modelBackend === "stub" ? "demo backend — placeholder replies until a real model server (ollama / http) is set" : "models"}
               className={"hearth-act" + (runningModel && !busy ? " hearth-pill-live" : "")}
-              style={modelChip}
+              style={metaModel}
             >
-              <span style={{ color: runningModel ? "var(--accent)" : "var(--fg-subtle)", fontSize: 10 }}>✦</span>
+              <span style={{ color: runningModel ? "var(--accent)" : "var(--fg-subtle)" }}>✦</span>
               <span style={{ color: "var(--fg-muted)" }}>{modelLabel}</span>
-              {runningModel && modelBackend === "stub" && (
-                <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--bg)", background: "var(--danger)", borderRadius: 4, padding: "1px 5px", fontWeight: 700 }}>demo</span>
-              )}
-              {machineState === "waking" || machineState === "provisioning" ? <span className="hearth-spin" style={{ width: 8, height: 8 }} /> : null}
-            </button>
-            <span style={{ flex: 1 }} />
-            {busy ? (
-              <span style={{ display: "flex", alignItems: "center", gap: 7, marginRight: 4 }}>
-                <span className="hearth-shimmer" style={{ fontSize: 11, fontWeight: 500 }}>{WORK_PHASES[phase]}…</span>
-                <span style={{ display: "inline-flex", gap: 3 }}>
-                  <span className="hearth-dot" /><span className="hearth-dot" /><span className="hearth-dot" />
-                </span>
-              </span>
-            ) : (
-              <span style={{ fontSize: 10, color: "var(--fg-subtle)", marginRight: 4 }}>
-                ↵ {isRun ? "run" : "send"} · ⇥ mode<span className="hearth-desktop-only"> · ⌘J focus</span>
-              </span>
-            )}
-            <button onClick={submit} disabled={busy || !value.trim()} className="hearth-act hearth-act-primary" style={{ ...sendBtn, opacity: busy || !value.trim() ? 0.4 : 1 }} aria-label={isRun ? "run" : "send"}>
-              {isRun ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
-              )}
+              <span style={sep}>·</span>
+              <span style={{ color: isRun ? "var(--fg-muted)" : "var(--accent)", fontWeight: 600 }}>{isRun ? "run" : "ask"}</span>
+              {runningModel && modelBackend === "stub" && <span style={demoBadge}>demo</span>}
+              {(machineState === "waking" || machineState === "provisioning") && <span className="hearth-spin" style={{ width: 8, height: 8 }} />}
             </button>
           </div>
         </div>
@@ -387,17 +407,32 @@ const dock: CSSProperties = {
   padding: "8px 10px 10px",
   background: "var(--bg)",
 };
-const promptBox: CSSProperties = {
+const dockInner: CSSProperties = {
   width: "100%",
-  maxWidth: 760,
+  maxWidth: 820,
   display: "flex",
   flexDirection: "column",
   gap: 6,
+};
+const promptBox: CSSProperties = {
+  width: "100%",
+  display: "flex",
+  flexDirection: "column",
   background: "var(--bg-elevated)",
   border: "1px solid var(--border)",
-  borderRadius: 16,
-  padding: "10px 12px",
+  borderRadius: 12,
+  padding: "8px 10px 8px 12px",
   position: "relative",
+};
+const inputRow: CSSProperties = { display: "flex", alignItems: "flex-start", gap: 8 };
+const caret: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: 15,
+  lineHeight: "24px",
+  fontWeight: 700,
+  color: "var(--accent)",
+  userSelect: "none",
+  flexShrink: 0,
 };
 const promptBoxDragOver: CSSProperties = {
   borderColor: "var(--accent)",
@@ -427,6 +462,7 @@ const attachBtn: CSSProperties = {
   color: "var(--fg-muted)",
   cursor: "pointer",
   flexShrink: 0,
+  alignSelf: "flex-end",
 };
 
 function ClipIcon() {
@@ -451,7 +487,8 @@ const suggestChip: CSSProperties = {
   padding: "5px 10px",
 };
 const textarea: CSSProperties = {
-  width: "100%",
+  flex: 1,
+  minWidth: 0,
   resize: "none",
   background: "transparent",
   border: "none",
@@ -459,44 +496,67 @@ const textarea: CSSProperties = {
   color: "var(--fg)",
   fontSize: 14,
   lineHeight: 1.5,
-  minHeight: 40,
+  minHeight: 24,
   maxHeight: 160,
   overflowY: "auto",
+  paddingTop: 1,
 };
-const row: CSSProperties = { display: "flex", alignItems: "center", gap: 6 };
-const modePill: CSSProperties = {
+// meta line under the box — terminal-native: shortcuts / working (left), model · mode (right)
+const metaRow: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  padding: "0 4px",
+  minHeight: 16,
   fontFamily: "var(--font-mono)",
   fontSize: 11,
-  fontWeight: 600,
-  padding: "4px 9px",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  whiteSpace: "nowrap",
-  userSelect: "none",
+  color: "var(--fg-subtle)",
 };
-const modelChip: CSSProperties = {
+const metaLeft: CSSProperties = { display: "flex", alignItems: "center", whiteSpace: "nowrap", overflow: "hidden", minWidth: 0, color: "var(--fg-subtle)" };
+const metaModel: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 5,
-  fontSize: 12,
-  padding: "4px 9px",
-  borderRadius: 8,
   background: "transparent",
-  border: "1px solid var(--border)",
-  color: "var(--fg-muted)",
+  border: "none",
   cursor: "pointer",
+  fontFamily: "var(--font-mono)",
+  fontSize: 11.5,
+  padding: "3px 6px",
+  borderRadius: 7,
+  flexShrink: 0,
   whiteSpace: "nowrap",
 };
+const sep: CSSProperties = { color: "var(--fg-subtle)", margin: "0 6px" };
+const kbd: CSSProperties = { color: "var(--fg-muted)", fontWeight: 700 };
+const stopLink: CSSProperties = { background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 11, padding: 0 };
+const demoBadge: CSSProperties = { fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--bg)", background: "var(--danger)", borderRadius: 4, padding: "1px 5px", fontWeight: 700, marginLeft: 2 };
 const sendBtn: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 32,
-  height: 32,
+  width: 28,
+  height: 28,
   borderRadius: 999,
   border: "none",
   background: "var(--accent)",
   color: "var(--bg)",
   cursor: "pointer",
   flexShrink: 0,
+  alignSelf: "flex-end",
+};
+const stopBtn: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 28,
+  height: 28,
+  borderRadius: 999,
+  border: "1px solid var(--border-strong)",
+  background: "transparent",
+  color: "var(--fg-muted)",
+  cursor: "pointer",
+  flexShrink: 0,
+  alignSelf: "flex-end",
 };

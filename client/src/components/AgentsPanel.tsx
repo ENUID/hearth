@@ -90,12 +90,18 @@ export default function AgentsPanel({ onRun, onClose }: { onRun: (cmd: string) =
                     )
                   ) : (
                     <>
-                      <button onClick={() => install(a)} className="hearth-act hearth-act-primary" style={runBtn}>Install</button>
-                      {canFree && (
-                        <button onClick={() => launch(FREE_PREFIX + a.run)} className="hearth-act" style={secondaryBtn} title="run pointed at your free Hearth model">
-                          Run · free model
-                        </button>
-                      )}
+                      {/* one tap: install, then launch it (open-source → free model) */}
+                      <button
+                        onClick={() => launch(canFree ? `${a.install} && ${FREE_PREFIX}${a.run}` : `${a.install} && ${a.run}`)}
+                        className="hearth-act hearth-act-primary"
+                        style={runBtn}
+                        title="install and launch in your terminal"
+                      >
+                        Install &amp; run
+                      </button>
+                      <button onClick={() => install(a)} className="hearth-act" style={secondaryBtn} title="just install — the Run button appears when it's ready">
+                        Install only
+                      </button>
                     </>
                   )}
                 </div>

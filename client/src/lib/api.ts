@@ -184,11 +184,12 @@ export const startModel = (modelId: string, ws = "workspace"): Promise<{ running
 export const stopModel = (ws = "workspace"): Promise<{ running: RunningModel | null }> => authedJson("/api/models/stop", { method: "POST", body: { ws } });
 
 /** Streaming OpenAI-compatible chat against the workspace's running model. */
-export function modelChat(messages: { role: string; content: string }[], ws = "workspace"): Promise<Response> {
+export function modelChat(messages: { role: string; content: string }[], ws = "workspace", signal?: AbortSignal): Promise<Response> {
   return fetch(withScope("/api/models/v1/chat/completions"), {
     method: "POST",
     headers: { "content-type": "application/json", ...authHeaders() },
     body: JSON.stringify({ ws, messages, stream: true }),
+    signal,
   });
 }
 
