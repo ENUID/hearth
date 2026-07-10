@@ -139,7 +139,9 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
   useEffect(() => {
     if (!busy) { setPhase(0); setElapsed(0); return; }
     const start = Date.now();
-    const t = setInterval(() => setPhase((p) => (p + 1) % WORK_PHASES.length), 1400);
+    // Advance through the phases and hold on the last, so the step pills
+    // accumulate (they don't loop back to the start).
+    const t = setInterval(() => setPhase((p) => Math.min(p + 1, WORK_PHASES.length - 1)), 1400);
     const e = setInterval(() => setElapsed((Date.now() - start) / 1000), 100);
     return () => { clearInterval(t); clearInterval(e); };
   }, [busy]);
@@ -305,6 +307,28 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
             </button>
           )}
 
+          {/* thinking steps — accumulate as animated pills while the AI works,
+              like a CLI agent's Run / Thought / Read log. The last pill carries
+              the live timer and a [stop]. */}
+          {busy && (
+            <div style={thinkBox}>
+              {WORK_PHASES.slice(0, phase + 1).map((ph, i) => {
+                const active = i === phase;
+                return (
+                  <div key={i} className="hearth-rise" style={{ ...stepPill, ...(active ? stepPillActive : {}) }}>
+                    {active
+                      ? <span className="hearth-spin" style={{ width: 10, height: 10, flexShrink: 0 }} />
+                      : <span style={{ color: "var(--accent)", fontSize: 11, flexShrink: 0 }}>✓</span>}
+                    <span style={{ color: active ? "var(--fg)" : "var(--fg-subtle)", fontWeight: active ? 600 : 400 }}>{ph}</span>
+                    <span style={{ flex: 1 }} />
+                    {active && <span style={{ color: "var(--fg-subtle)" }}>{elapsed.toFixed(1)}s</span>}
+                    {active && <button type="button" onClick={stop} style={stopLink} title="stop (Esc)">[stop]</button>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div
             className="hearth-cmdbar"
             style={{ ...promptBox, ...(dragOver ? promptBoxDragOver : {}) }}
@@ -336,38 +360,21 @@ export default function CommandBar({ ws, runningModel, modelBackend, machineStat
               <button type="button" onClick={() => fileInputRef.current?.click()} disabled={attaching} title="attach a file or image" className="hearth-act" style={{ ...attachBtn, opacity: attaching ? 0.5 : 1 }}>
                 {attaching ? <span className="hearth-spin" style={{ width: 12, height: 12 }} /> : <ClipIcon />}
               </button>
-              {busy ? (
-                <button type="button" onClick={stop} className="hearth-act" style={stopBtn} aria-label="stop" title="stop (Esc)">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
-                </button>
-              ) : (
-                <button type="button" onClick={submit} disabled={!value.trim()} className="hearth-act hearth-act-primary" style={{ ...sendBtn, opacity: !value.trim() ? 0.4 : 1 }} aria-label={isRun ? "run" : "send"}>
-                  {isRun ? (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                  ) : (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
-                  )}
-                </button>
-              )}
+              <button type="button" onClick={submit} disabled={busy || !value.trim()} className="hearth-act hearth-act-primary" style={{ ...sendBtn, opacity: busy || !value.trim() ? 0.4 : 1 }} aria-label={isRun ? "run" : "send"}>
+                {isRun ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+                )}
+              </button>
             </div>
           </div>
 
           {/* status line — working / shortcuts (left) · model · mode (right) */}
           <div style={metaRow}>
             <span style={metaLeft}>
-              {busy ? (
-                <>
-                  <span className="hearth-shimmer" style={{ fontWeight: 600, color: "var(--fg-muted)" }}>{WORK_PHASES[phase]}…</span>
-                  <span style={{ color: "var(--fg-subtle)", marginLeft: 6 }}>{elapsed.toFixed(1)}s</span>
-                  <span style={sep}>·</span>
-                  <button type="button" onClick={stop} style={stopLink}>[stop]</button>
-                </>
-              ) : (
-                <>
-                  <span style={kbd}>⏎</span> {isRun ? "run" : "send"}<span style={sep}>·</span><span style={kbd}>⇥</span> mode
-                  <span className="hearth-desktop-only"><span style={sep}>·</span><span style={kbd}>⌘J</span> focus</span>
-                </>
-              )}
+              <span style={kbd}>⏎</span> {isRun ? "run" : "send"}<span style={sep}>·</span><span style={kbd}>⇥</span> mode
+              <span className="hearth-desktop-only"><span style={sep}>·</span><span style={kbd}>⌘J</span> focus</span>
             </span>
             <button
               type="button"
@@ -409,7 +416,6 @@ const dock: CSSProperties = {
 };
 const dockInner: CSSProperties = {
   width: "100%",
-  maxWidth: 820,
   display: "flex",
   flexDirection: "column",
   gap: 6,
@@ -420,10 +426,25 @@ const promptBox: CSSProperties = {
   flexDirection: "column",
   background: "var(--bg-elevated)",
   border: "1px solid var(--border)",
-  borderRadius: 12,
+  borderRadius: 8,
   padding: "8px 10px 8px 12px",
   position: "relative",
 };
+// thinking steps stack — animated pills above the input while the AI works
+const thinkBox: CSSProperties = { display: "flex", flexDirection: "column", gap: 4, padding: "0 2px 2px" };
+const stepPill: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  fontFamily: "var(--font-mono)",
+  fontSize: 12,
+  padding: "5px 10px",
+  borderRadius: 8,
+  background: "color-mix(in srgb, var(--bg-elevated) 55%, transparent)",
+  border: "1px solid var(--border)",
+  color: "var(--fg-muted)",
+};
+const stepPillActive: CSSProperties = { borderColor: "var(--accent)", background: "var(--accent-soft)" };
 const inputRow: CSSProperties = { display: "flex", alignItems: "flex-start", gap: 8 };
 const caret: CSSProperties = {
   fontFamily: "var(--font-mono)",
@@ -542,20 +563,6 @@ const sendBtn: CSSProperties = {
   border: "none",
   background: "var(--accent)",
   color: "var(--bg)",
-  cursor: "pointer",
-  flexShrink: 0,
-  alignSelf: "flex-end",
-};
-const stopBtn: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 28,
-  height: 28,
-  borderRadius: 999,
-  border: "1px solid var(--border-strong)",
-  background: "transparent",
-  color: "var(--fg-muted)",
   cursor: "pointer",
   flexShrink: 0,
   alignSelf: "flex-end",

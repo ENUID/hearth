@@ -19,7 +19,9 @@ function sse(res: Response, obj: unknown) {
 }
 
 // Deterministic OpenAI-style stream so chat works without a real model (sandbox).
-function stubChat(res: Response, modelName: string, messages: { role: string; content?: string }[]) {
+// Streamed with a gentle cadence so it feels alive (and the client's thinking
+// indicator has time to show); abort-safe so a client Stop ends it cleanly.
+async function stubChat(res: Response, modelName: string, messages: { role: string; content?: string }[]) {
   res.setHeader("content-type", "text/event-stream");
   res.setHeader("cache-control", "no-cache");
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
@@ -29,8 +31,11 @@ function stubChat(res: Response, modelName: string, messages: { role: string; co
     `(You said: "${said}") To get real answers, the operator sets HEARTH_MODEL_BACKEND=ollama (or =http with any ` +
     `OpenAI-compatible server) and this exact chat serves the real model.`;
   for (const word of reply.split(/(\s+)/)) {
+    if (res.writableEnded || res.destroyed) return; // client aborted (Stop)
     sse(res, { choices: [{ delta: { content: word }, finish_reason: null }] });
+    await new Promise((r) => setTimeout(r, 26));
   }
+  if (res.writableEnded || res.destroyed) return;
   sse(res, { choices: [{ delta: {}, finish_reason: "stop" }] });
   res.write("data: [DONE]\n\n");
   res.end();
@@ -84,7 +89,7 @@ export function mountModels(app: Express, isAuthed: AuthFn): void {
 
     if (!endpoint) {
       const model = findModel(running.modelId);
-      stubChat(res, model?.name ?? running.modelId, messages);
+      await stubChat(res, model?.name ?? running.modelId, messages);
       return;
     }
 
